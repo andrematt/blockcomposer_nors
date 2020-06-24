@@ -4,87 +4,6 @@ import {
   updateMatrixDB
 } from "./database_functs.js";
 
-
-//TODO: nel check di popularity tieni presente che le aizoni che recuperi dal DB
-// sono in formato stringa e possono includere più azioni! trasforma in OBJ
-
-/**
- * salva l'edge tra source e dest incrementando l'indice in posizione [s][d] 
- * nella matrice passata come arg
- * @param {*} origin 
- * @param {*} source 
- * @param {*} matrix 
- */
-function increaseLinkCount(source, dest, linkArr) {
-  "use strict";
-  console.log("increasing matrix from", source, "to ", dest);
-  for (let i = 0; i < linkArr.length; i++) {
-    if (linkArr[i].source === source && linkArr[i].dest === dest) {
-      linkArr[i].value++;
-      return linkArr;
-    }
-  }
-  let newEntry = {
-    "source": source,
-    "dest": dest,
-    value: 1
-  };
-  linkArr.push(newEntry);
-  return linkArr;
-  /*
-  let firstRow = matrix[0];
-  let sourceIndex = firstRow.indexOf(source);
-  let destIndex = firstRow.indexOf(dest);
-  matrix[sourceIndex][destIndex]++;
-  console.log("resulting matrix: ", matrix);
-  return matrix;
-  */
-}
-
-/**
- * salva l'edge tra source e dest incrementando l'indice in posizione [s][d] 
- * nella matrice passata come arg
- * @param {*} origin 
- * @param {*} source 
- * @param {*} matrix 
- */
-function increaseMatrixCount(source, dest, matrix) {
-  "use strict";
-  console.log("increasing matrix from", source, "to ", dest);
-  let firstRow = matrix[0];
-  let sourceIndex = firstRow.indexOf(source);
-  let destIndex = firstRow.indexOf(dest);
-  matrix[sourceIndex][destIndex]++;
-  console.log("resulting matrix: ", matrix);
-  return matrix;
-}
-
-/**
- * Unisce la vecchia matrice con quella corrente, invia al db 
- * @param {*} oldMatrix 
- * @param {*} currentMatrix 
- */
-function mergeMatrixes(oldMatrix, currentMatrix) {
-  "use strict";
-  let newMatrix = [...oldMatrix];
-  for (let i = 0; i < currentMatrix.length; i++) {
-    let found = false;
-    for (let j = 0; j < newMatrix.length; j++) {
-      if (currentMatrix[i].source === newMatrix[j].source &&
-        currentMatrix[i].dest === newMatrix[j].dest) {
-        newMatrix[j].value++;
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      newMatrix.push(currentMatrix[i]);
-    }
-  }
-  console.log("MATRIXES MERGED!", newMatrix);
-  return newMatrix;
-}
-
 /**
  * 
  * @param {*} matrix 
@@ -109,65 +28,6 @@ export async function addCurrentMatrixToGlobalMatrix(matrix) {
     }
   }
   return;
-}
-
-/**
- * Funzione che trasforma una struttura DOM di elementi xml in una matrice di adiacenza.
- * I nodi della matrice sono gli elementi di tipo block, i vertici tra i nodi sono estratti
- * dai tag next (vertice tra blocco precedente e successivo), value (stesso), statement (collega
- * il blocco precedente a tutti i blocchi presenti all'interno dello statement)
- * @param {*} xml 
- */
-function createTriggerMatrix(xml, workspace) {
-  "use strict";
-  let allElements = xml.querySelectorAll("block");
-  let allNames = [];
-
-  for (let i = 0; i < allElements.length; i++) {
-    allNames.push(allElements[i].getAttribute("type"));
-  }
-
-  let linkArray = [];
-
-  for (let i = 0; i < allElements.length; i++) {
-    //console.log(allElements[i]);
-    console.log("HTML: ", allElements[i].outerHTML);
-    let myType = allElements[i].getAttribute('type');
-    let myId = allElements[i].getAttribute('id');
-    console.log("myType:", myType);
-    let block = workspace.getBlockById(myId);
-    console.log(block);
-    let myChildren = block.getChildren();
-    if (myChildren && myChildren.length > 0) {
-      for (let j = 0; j < myChildren.length; j++) {
-        let childType = myChildren[j].type;
-        linkArray = increaseLinkCount(myType, childType, linkArray);
-        //taggedMatrix = increaseMatrixCount(myType, childType, taggedMatrix);
-      }
-    }
-    console.log("LINK ARR!!", linkArray);
-  }
-
-  //console.log("final matrix: ", taggedMatrix);
-  //return taggedMatrix;
-  return linkArray;
-}
-
-/**
- * 
- * @param {*} candidateList 
- */
-function checkOnlyTerminalLeafs(candidateList) {
-  "use strict";
-  let onlyEventCond = true;
-  for (let i = 0; i < candidateList.length; i++) {
-    // aggiungere date e time
-    if (candidateList[i].dest !== "condition" || candidateList[i] !== "event") {
-      onlyEventCond = false;
-      break;
-    }
-  }
-  return onlyEventCond;
 }
 
 /**
@@ -220,76 +80,7 @@ export function returnBestSuggestion(suggestionList) {
   return suggestionList[maxIndex];
 }
 
-/**
- * Ordina la lista dei candidati in base al peso dei link ("value")
- * @param {*} candidatesList 
- */
-function sortCandidatesList(candidatesList) {
-  "use strict";
-  console.log("sorting!", candidatesList);
-  candidatesList.sort(function (a, b) {
-    if (a.value > b.value) {
-      return -1;
-    }
-    if (a.value < b.value) {
-      return 1;
-    }
-    return 0;
-  });
-  console.log("sorted!", candidatesList);
-  return candidatesList;
-}
 
-/**
- * Rimuove dalla lista dei candidati i collegamenti che puntano verso group,
- * poichè non verranno usati per costruire best path (come gestire nesting?)
- * @param {*} candidatesList 
- */
-function filterCandidatesList(candidatesList) {
-  "use strict";
-  let filtered = candidatesList.filter(function (e) {
-    return (e.source !== "group" && e.destination !== "group");
-  });
-  return filtered;
-}
-
-
-/**
- * Unisce i singoli graph delle regole prelevati dal db
- * @param {*} graphsArr 
- */
-function createMergedGraph(graphsArr) {
-  "use strict";
-  let startArray = [];
-  let flattedArray = [];
-  for (let i = 0; i < graphsArr.length; i++) {
-    startArray.push(JSON.parse(graphsArr[i].graph));
-  }
-
-  for (let i = 0; i < startArray[0].length; i++) {
-    flattedArray.push(startArray[0][i]);
-  }
-
-  for (let i = 1; i < startArray.length; i++) {
-    for (let j = 0; j < startArray[i].length; j++) {
-      let found = false;
-      for (let k = 0; k < flattedArray.length; k++) {
-        if (startArray[i][j].source === flattedArray[k].source &&
-          startArray[i][j].dest === flattedArray[k].dest) {
-          flattedArray[k].value++;
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        flattedArray.push(startArray[i][j]);
-      }
-    }
-
-  }
-  console.log(flattedArray);
-  return flattedArray;
-}
 
 /**
  * non usata
@@ -319,113 +110,6 @@ export function generateSuggestionsCategory(passedGraphs, firstTrigger) {
   let rulesMatrixEntriesObj = filterCandidatesList(allRulesMatrixEntriesObj);
   objResult.initialPathList = rulesMatrixEntriesObj;
 
-}
-
-/**
- * controllo per rendere compatibile il formato dei nomi dei trigger con quello
- * dei blocchi
- * @param {*} rulesMatrix 
- */
-function checkNames(rulesMatrix) {
-  "use strict";
-  let newRulesMatrix = [];
-  for (let i = 0; i < rulesMatrix.length; i++) {
-    if (rulesMatrix[i].source === null || rulesMatrix[i].dest === null) {
-      console.log("find a null in", rulesMatrix[i]);
-    }
-    else {
-
-      if (rulesMatrix[i].source === "AND") {
-        rulesMatrix[i].source = "and";
-      }
-      else if (rulesMatrix[i].source === "OR") {
-        rulesMatrix[i].source = "or";
-      }
-      else if (rulesMatrix[i].source === "not") {
-        rulesMatrix[i].source = "not_dynamic";
-      }
-      else if (rulesMatrix[i].source === "time") {
-        rulesMatrix[i].source = "hour_min";
-      }
-      else if (rulesMatrix[i].source === "date") {
-        rulesMatrix[i].source = "day";
-      }
-
-
-      if (rulesMatrix[i].dest === null) {
-        rulesMatrix.splice(i, 1);
-      }
-      else if (rulesMatrix[i].dest === "AND") {
-        rulesMatrix[i].dest = "and";
-      }
-      else if (rulesMatrix[i].dest === "OR") {
-        rulesMatrix[i].dest = "or";
-      }
-      else if (rulesMatrix[i].dest === "not") {
-        rulesMatrix[i].dest = "not_dynamic";
-      }
-      else if (rulesMatrix[i].dest === "time") {
-        rulesMatrix[i].dest = "hour_min";
-      }
-      else if (rulesMatrix[i].dest === "date") {
-        rulesMatrix[i].dest = "day";
-      }
-      newRulesMatrix.push(rulesMatrix[i]);
-    }
-  }
-  return newRulesMatrix;
-}
-
-
-
-/**
- * Cerca qual'è il punto di partenza più indicato, guardando al nodo con più
- * collegamenti tra quelli passati come possibili punti iniziali
- * @param {*} startingNodes 
- */
-function getBestStartingPoint(candidates, startingNodes) {
-  "use strict";
-  if (startingNodes.length === 1) {
-    return startingNodes[0];
-  }
-  let max;
-  let maxValue = -1;
-  for (let i = 0; i < startingNodes.length; i++) {
-    for (let j = 0; j < candidates.length; j++) {
-      if (startingNodes.includes(candidates[j].source) &&
-        candidates[j].value > maxValue &&
-        (candidates[j].dest === "event" || candidates[j].dest === "condition")) {
-        max = candidates[j].source;
-        maxValue = candidates[j].value;
-      }
-    }
-  }
-  return max;
-}
-
-/**
- * Cerca qual'è il punto di partenza più indicato, guardando al nodo con più
- * collegamenti tra quelli passati come possibili punti iniziali
- * @param {*} startingNodes 
- */
-function getBestStartingPointOld(candidates, startingNodes) {
-  "use strict";
-  if (startingNodes.length === 1) {
-    return startingNodes[0];
-  }
-  let max;
-  let maxValue = -1;
-  for (let i = 0; i < startingNodes.length; i++) {
-    for (let j = 0; j < candidates[0].length; j++) {
-      if (startingNodes.includes(candidates[0][j].source) &&
-        candidates[0][j].value > maxValue &&
-        (candidates[0][j].dest === "event" || candidates[0][j].dest === "condition")) {
-        max = candidates[0][j].source;
-        maxValue = candidates[0][j].value;
-      }
-    }
-  }
-  return max;
 }
 
 
@@ -587,314 +271,7 @@ export async function generateSuggestions(passedGraphs, firstTrigger) {
   return objResult;
 }
 
-/**
- * 
- * @param {*} nonTerminal 
- * @param {*} terminal 
- */
-function checkConflictBetweenTerms(nonTerminal, terminal) {
-  "use strict";
-  if (nonTerminal.source !== terminal.source) {
-    return true;
-  }
-  return false;
-}
 
-/** 
- * Estrae il miglior path dagli array di candidati.
- * Se incontra un collegamento terminale (verso event o condition) lo 
- * aggiunge al path a meno che non ne sia già stato aggiunto uno di quel 
- * tipo. Se incontra un link non terminale (and, or, altro trigger, group) lo aggiunge se nel 
- * livello precedente è presente un link a questo nodo, e esso non è già stato 
- * usato precedentemente (evita loops).Se incontra un link in entrata verso 
- * "hour_min" o verso "day" la aggiunge direttamente al path senza aumentare i
- * conteggi. 
- * @param {*} candidates 
- */
-function pathCreatorNested(candidates, startingNode) {
-  //Adesso startingNode è un array
-  "use strict";
-  let bestPath = [];
-  for (let i = 0; i < candidates.length; i++) {
-    let actualDist = [];
-    let terminalFound = false;
-    let terminal;
-    let nonTerminalFound = false;
-    let nonTerminal;
-    let negationDayOrDate = false;
-    for (let j = 0; j < candidates[i].length; j++) {
-      if (isEventCondition(candidates[i][j])) {
-        if (!terminalFound) {
-          if (atPreviousDistance(candidates[i][j], bestPath[i - 1]) && !negationDayOrDate) {
-          // bisogna controllare che il trigger trovato combaci con il tipo di
-          // trigger
-          let conflictWithTerminal = false;
-          if (nonTerminalFound) {
-            conflictWithTerminal = checkConflictBetweenTerms(nonTerminal, candidates[i][j]);
-          }
-          if (!conflictWithTerminal) {
-            terminalFound = true;
-            terminal = candidates[i][j];
-          }
-        }
-      }
-      }
-      else {
-        // se è negazione o date, aggiungi senza segnalare notTerminalFound
-        //if (candidates[i][j].source === "not_dynamic") {
-        if (candidates[i][j].dest === "hour_min" ||
-          candidates[i][j].dest === "day" ||
-          candidates[i][j].source === "not_dynamic") {
-          if (atPreviousDistance(candidates[i][j], bestPath[i - 1]) && !negationDayOrDate) {
-            actualDist.push(candidates[i][j]);
-            negationDayOrDate = true;
-          }
-        }
-        else if (!nonTerminalFound) {
-          if (atPreviousDistance(candidates[i][j], bestPath[i - 1])) {
-            if (!foundSelfLoop(candidates[i][j], bestPath[i - 1]) && candidates[i][j].dest !== "relativePosition-pointOfInterest") {
-              let conflictWithTerminal = false;
-              // bisogna controllare che il trigger trovato combaci con il tipo di
-              // trigger
-              if (terminalFound) {
-                conflictWithTerminal = checkConflictBetweenTerms(candidates[i][j], terminal);
-              }
-              if (!conflictWithTerminal) {
-                nonTerminalFound = true;
-                nonTerminal = candidates[i][j];
-              }
-            }
-          }
-        }
-      }
-    }
-    if (nonTerminalFound) {
-      actualDist.push(nonTerminal);
-    }
-    if (terminalFound) {
-      actualDist.push(terminal);
-    }
-    if (actualDist.length > 0) {
-      let ordered = swapTerminalNonTerminal(actualDist);
-      bestPath.push(ordered);
-    }
-    if (!nonTerminalFound) {
-      return bestPath;
-    }
-  }
-  return bestPath;
-}
-
-/**
- * Scambia di posto gli elementi, in modo che venga prima il collegamento 
- * con "event/condition", e dopo quello al blocco successivo.
- * @param {*} candidatesArr 
- */
-
-function swapTerminalNonTerminal(candidatesArr) {
-  "use strict";
-  if (candidatesArr.length == 2) {
-    if (isEventCondition(candidatesArr[1])) {
-      let swap = [...candidatesArr];
-      candidatesArr[0] = swap[1];
-      candidatesArr[1] = swap[0];
-    }
-  } else if (candidatesArr.length > 2) {
-    for (let i = 0; i < candidatesArr.length; i++) {
-      if (isEventCondition(candidatesArr[i])) {
-        let swap = [...candidatesArr];
-        candidatesArr[0] = swap[i];
-        candidatesArr[i] = swap[0];
-      }
-    }
-    for (let i = 0; i < candidatesArr.length; i++) {
-      if (candidatesArr[i].dest === "or" || candidatesArr[i].dest === "and") {
-        let swap = [...candidatesArr];
-        candidatesArr[candidatesArr.length - 1] = swap[i];
-        candidatesArr[i] = swap[swap.length - 1];
-      }
-    }
-  }
-  return candidatesArr;
-}
-
-
-/**
- * Metodo per controllare che il collegamento trovato esista: guarda se tra gli
- * elementi a a distanza i-1 esiste come destinazione il candidato attuale 
- * @param {*} candidate 
- * @param {*} candidatesArr 
- */
-function atPreviousDistance(candidate, candidatesArr) {
-  //alla prima iterazione di pathCreatorNested non abbiamo gli elementi 
-  //inseriti prima
-  "use strict";
-  if (!candidatesArr) {
-    return true;
-  }
-  else {
-    for (let i = 0; i < candidatesArr.length; i++) {
-      if (candidate.source === candidatesArr[i].dest) {
-        return true;
-      }
-    }
-    return false;
-  }
-}
-
-/**
- * Metodo per evitare loopback: controlla l'elemento che vogliamo inserire 
- * nel path non punti ad un elemento presente nell'array dei paths a distanza
- * i-1
- * @param {*} candidate 
- * @param {*} candidateArr 
- */
-function foundSelfLoop(candidate, candidatesArr) {
-  "use strict";
-  if (!candidatesArr) {
-    return false;
-  }
-  else {
-    for (let i = 0; i < candidatesArr.length; i++) {
-      if (candidate.dest === candidatesArr[i].source) {
-        return true;
-      }
-    }
-    return false;
-  }
-}
-
-
-/**
- * Non più usato
- * @param {*} candidates 
- * @param {*} element 
- */
-function pathCreator(candidates, element, paths, path) {
-  "use strict";
-  if (!element) {
-    element = candidates[0];
-  }
-  if (!paths) {
-    paths = [];
-  }
-  if (!path) {
-    path = [];
-  }
-  let onlyEventCond = checkOnlyTerminalLeafs(candidates);
-  // condizione di terminazione
-  if (onlyEventCond) {
-    //chiude l'eventuale path in corso
-    if (path.length > 0) {
-      //path.push(candidates[candidates.length-1]);
-      paths.push(path);
-    }
-    return paths;
-  }
-  else {
-    //ottieni l'elemento puntato da "dest" di element e aggiugi element al path
-    let pointAt = getDest(element, candidates);
-    path.push(element);
-    //Se l'elemento puntato non appare nei source ma non si tratta di un nodo
-    //terminale siamo alla fine di un path: rimuovi element dai candidates e 
-    //riparti dal primo nodo non terminale
-    if (!pointAt && !isEventCondition(element)) {
-      let position = candidates.indexOf(element);
-      candidates.splice(position, 1);
-      paths.push(path);
-      path = [];
-      let newElement = getNoLeaf(candidates);
-      pathCreator(candidates, newElement, paths, path);
-    }
-    //Se l'elemento puntato non appare nei source ed è un nodo terminale, 
-    //vai avanti con il prossimo nodo non terminale senza rimuoverlo dai 
-    // candidates
-    else if (!pointAt && isEventCondition(element)) {
-      let newElement = getNextNoLeaf(candidates, path);
-      let position = candidates.indexOf(element);
-      candidates.splice(position, 1);
-      pathCreator(candidates, newElement, paths, path);
-    }
-    // Se esiste pointAt significa che siamo all'interno di un path: aggiungi
-    // l'elemento al path e rimuovilo dai candidates
-    else {
-      let position = candidates.indexOf(element);
-      candidates.splice(position, 1);
-      pathCreator(candidates, pointAt, paths, path);
-      //richiama ricorsivo con pointAt
-    }
-  }
-  return paths;
-}
-
-/**
- * Restituisce il prossimo elemento del path, cioè il prossimo nodo non
- * terminale che non è già presente tra le sources del path
- * @param {*} element 
- * @param {*} candidates 
- */
-function getNextNoLeaf(candidates, path) {
-  "use strict";
-  for (let i = 0; i < candidates.length; i++) {
-    if (!isEventCondition(candidates[i]) && absentNonTerminalNode(candidates[i], path)) {
-      return candidates[i];
-    }
-  }
-}
-
-/**
- * controlla se non ci sia già nel path un nodo non terminale con la stessa 
- * source
- * @param {*} element 
- * @param {*} path 
- */
-function absentNonTerminalNode(element, path) {
-  "use strict";
-  let absent = true;
-  for (let i = 0; i < path.length; i++) {
-    if (path[i].source === element.source) {
-      if (!isEventCondition(path[i])) {
-        return false;
-      }
-    }
-  }
-  return absent;
-}
-
-/**
- * 
- * @param {*} element 
- * @param {*} candidates 
- */
-function getDest(element, candidates) {
-  "use strict";
-  let results = [];
-  for (let i = 0; i < candidates.length; i++) {
-    if (candidates[i].source === element.dest) {
-      results.push(candidates[i]);
-    }
-  }
-  if (results) {
-    return results[0];
-  }
-}
-
-/**
- * 
- * @param {*} candidates 
- */
-function getNoLeaf(candidates) {
-  "use strict";
-  let results = [];
-  for (let i = 0; i < candidates.length; i++) {
-    if (!isEventCondition(candidates[i])) {
-      results.push(candidates[i]);
-    }
-  }
-  if (results) {
-    return results[0];
-  }
-}
 
 /**
  * TODO: rinomina in pointToEventCondition
@@ -907,6 +284,160 @@ export function isEventCondition(element) {
   }
   return false;
 }
+
+const triggerToGraphSource = (trigger) => {
+  "use strict";
+  let graphEntry = {
+    name : trigger.parent? trigger.parent + "-" + trigger.element.realName : trigger.element.realName,
+    type: trigger.triggerType,
+    value: trigger.value,
+  };
+  return graphEntry;
+};
+
+const actionToGraphSource = (action) => {
+  "use strict";
+  let graphEntry = {
+    name : action.parent? action.parent + "-" + action.action.realName : action.action.realName,
+    type: action.type,
+    value: action.value,
+  };
+  return graphEntry;
+};
+
+const triggerToGraphLink = (ruleObj, flags) => {
+  "use strict";
+  if(ruleObj.triggers[flags.triggerToExamine +1]){
+    let graphEntry = {
+      value : ruleObj.triggers[flags.triggerToExamine].nextOperator
+    };
+    return graphEntry;
+  }
+  else {
+    let graphEntry = {
+      value: "RuleLink"
+    };
+    return graphEntry;
+  }
+};
+
+const actionToGraphLink = (ruleObj, flags) => {
+  "use strict";
+  if(ruleObj.actions[flags.actionToExamine +1]){
+    let graphEntry = {
+      value : ruleObj.actionMode
+    };
+    return graphEntry;
+  }
+  else {
+    let graphEntry = {
+      value: "END"
+    };
+    return graphEntry ;
+  }
+};
+
+
+const triggerToGraphDest = (trigger) => {
+  "use strict";
+  let graphEntry = {
+    name : trigger.parent? trigger.parent + "-" + trigger.element.realName : trigger.element.realName,
+    type: trigger.triggerType,
+    value: trigger.value,
+  };
+  return graphEntry;
+};
+
+const actionToGraphDest = (action) => {
+  "use strict";
+  let graphEntry = {
+    name : action.parent? action.parent + "-" + action.action.realName : action.action.realName,
+    type: action.type,
+    value: action.value,
+  };
+  return graphEntry;
+};
+
+const checkOtherAvailableTrigger = (flags, triggers) => {
+  "use strict";
+  return flags.triggerToExamine >= triggers.length ? true : false;
+};
+
+const checkOtherAvailableAction = (flags, actions) => {
+  "use strict";
+  return flags.actionToExamine >= actions.length ? true : false;
+};
+
+/**
+ * Built and returns the graph of a rule. The general structure of a entry 
+ * is {source - link type - dest}. Link type can be and, or, not (in
+ * this case, the destination equals to the source), rule (connects the 
+ * trigger to the action part of a rule), sequential, parallel (both connecting 
+ * actions).   
+ * @param {*} workspace 
+ */ 
+export const generateGraphFromRule = (ruleObj, ruleGraph = undefined, flags = undefined, currentEntry = undefined) => {
+if(ruleGraph === undefined) {
+  ruleGraph = [];
+}
+if (flags === undefined){
+  flags = {
+    examinedAllTriggers : false,
+    triggerToExamine: 0,
+    examinedAllActions: false,
+    actionToExamine: 0
+  };
+}
+if (currentEntry === undefined){
+  currentEntry = {
+    source: undefined,
+    link: undefined,
+    dest: undefined
+  };
+}
+
+if(currentEntry.source === undefined){
+ if(!flags.examinedAllTriggers){
+  currentEntry.source = triggerToGraphSource(ruleObj.triggers[flags.triggerToExamine]);
+  currentEntry.link = triggerToGraphLink(ruleObj, flags);
+  flags.triggerToExamine ++;
+ }
+ else if(!flags.examinedAllActions){
+  currentEntry.source = actionToGraphSource(ruleObj.actions[flags.actionToExamine]);
+  currentEntry.link = actionToGraphLink(ruleObj, flags);
+  flags.actionToExamine ++;
+ }
+}
+
+else if(currentEntry.dest === undefined){ 
+  if(!flags.examinedAllTriggers){
+    currentEntry.dest = triggerToGraphDest(ruleObj.triggers[flags.triggerToExamine]);
+   }
+   else if(!flags.examinedAllActions){
+    currentEntry.dest = actionToGraphDest(ruleObj.actions[flags.actionToExamine]);
+   }
+}
+
+if (currentEntry.source !== undefined && currentEntry.link !== undefined && currentEntry.dest !== undefined) { 
+  ruleGraph.push(currentEntry);
+  currentEntry = undefined;
+}
+
+flags.examinedAllTriggers = checkOtherAvailableTrigger(flags, ruleObj.triggers);
+flags.examinedAllActions = checkOtherAvailableAction(flags, ruleObj.actions);
+
+if(flags.examinedAllTriggers === true && flags.examinedAllActions === true){
+  currentEntry.dest = "END";
+  ruleGraph.push(currentEntry);
+  return ruleGraph;
+}
+else {
+  generateGraphFromRule(ruleObj, ruleGraph, flags, currentEntry);
+}
+
+return ruleGraph;
+};
+
 
 /**
  * Costruisce e restituisce la matrice di pesi per la singola regola
@@ -1431,5 +962,629 @@ function extractFromAllRules(workspaceTriggers, allRules) {
   });
   return rulesCopy;
 }
+
+/**
+ * 
+ * @param {*} nonTerminal 
+ * @param {*} terminal 
+ */
+function checkConflictBetweenTerms(nonTerminal, terminal) {
+  "use strict";
+  if (nonTerminal.source !== terminal.source) {
+    return true;
+  }
+  return false;
+}
+
+/** 
+ * Estrae il miglior path dagli array di candidati.
+ * Se incontra un collegamento terminale (verso event o condition) lo 
+ * aggiunge al path a meno che non ne sia già stato aggiunto uno di quel 
+ * tipo. Se incontra un link non terminale (and, or, altro trigger, group) lo aggiunge se nel 
+ * livello precedente è presente un link a questo nodo, e esso non è già stato 
+ * usato precedentemente (evita loops).Se incontra un link in entrata verso 
+ * "hour_min" o verso "day" la aggiunge direttamente al path senza aumentare i
+ * conteggi. 
+ * @param {*} candidates 
+ */
+function pathCreatorNested(candidates, startingNode) {
+  //Adesso startingNode è un array
+  "use strict";
+  let bestPath = [];
+  for (let i = 0; i < candidates.length; i++) {
+    let actualDist = [];
+    let terminalFound = false;
+    let terminal;
+    let nonTerminalFound = false;
+    let nonTerminal;
+    let negationDayOrDate = false;
+    for (let j = 0; j < candidates[i].length; j++) {
+      if (isEventCondition(candidates[i][j])) {
+        if (!terminalFound) {
+          if (atPreviousDistance(candidates[i][j], bestPath[i - 1]) && !negationDayOrDate) {
+          // bisogna controllare che il trigger trovato combaci con il tipo di
+          // trigger
+          let conflictWithTerminal = false;
+          if (nonTerminalFound) {
+            conflictWithTerminal = checkConflictBetweenTerms(nonTerminal, candidates[i][j]);
+          }
+          if (!conflictWithTerminal) {
+            terminalFound = true;
+            terminal = candidates[i][j];
+          }
+        }
+      }
+      }
+      else {
+        // se è negazione o date, aggiungi senza segnalare notTerminalFound
+        //if (candidates[i][j].source === "not_dynamic") {
+        if (candidates[i][j].dest === "hour_min" ||
+          candidates[i][j].dest === "day" ||
+          candidates[i][j].source === "not_dynamic") {
+          if (atPreviousDistance(candidates[i][j], bestPath[i - 1]) && !negationDayOrDate) {
+            actualDist.push(candidates[i][j]);
+            negationDayOrDate = true;
+          }
+        }
+        else if (!nonTerminalFound) {
+          if (atPreviousDistance(candidates[i][j], bestPath[i - 1])) {
+            if (!foundSelfLoop(candidates[i][j], bestPath[i - 1]) && candidates[i][j].dest !== "relativePosition-pointOfInterest") {
+              let conflictWithTerminal = false;
+              // bisogna controllare che il trigger trovato combaci con il tipo di
+              // trigger
+              if (terminalFound) {
+                conflictWithTerminal = checkConflictBetweenTerms(candidates[i][j], terminal);
+              }
+              if (!conflictWithTerminal) {
+                nonTerminalFound = true;
+                nonTerminal = candidates[i][j];
+              }
+            }
+          }
+        }
+      }
+    }
+    if (nonTerminalFound) {
+      actualDist.push(nonTerminal);
+    }
+    if (terminalFound) {
+      actualDist.push(terminal);
+    }
+    if (actualDist.length > 0) {
+      let ordered = swapTerminalNonTerminal(actualDist);
+      bestPath.push(ordered);
+    }
+    if (!nonTerminalFound) {
+      return bestPath;
+    }
+  }
+  return bestPath;
+}
+
+/**
+ * Scambia di posto gli elementi, in modo che venga prima il collegamento 
+ * con "event/condition", e dopo quello al blocco successivo.
+ * @param {*} candidatesArr 
+ */
+
+function swapTerminalNonTerminal(candidatesArr) {
+  "use strict";
+  if (candidatesArr.length == 2) {
+    if (isEventCondition(candidatesArr[1])) {
+      let swap = [...candidatesArr];
+      candidatesArr[0] = swap[1];
+      candidatesArr[1] = swap[0];
+    }
+  } else if (candidatesArr.length > 2) {
+    for (let i = 0; i < candidatesArr.length; i++) {
+      if (isEventCondition(candidatesArr[i])) {
+        let swap = [...candidatesArr];
+        candidatesArr[0] = swap[i];
+        candidatesArr[i] = swap[0];
+      }
+    }
+    for (let i = 0; i < candidatesArr.length; i++) {
+      if (candidatesArr[i].dest === "or" || candidatesArr[i].dest === "and") {
+        let swap = [...candidatesArr];
+        candidatesArr[candidatesArr.length - 1] = swap[i];
+        candidatesArr[i] = swap[swap.length - 1];
+      }
+    }
+  }
+  return candidatesArr;
+}
+
+
+/**
+ * Metodo per controllare che il collegamento trovato esista: guarda se tra gli
+ * elementi a a distanza i-1 esiste come destinazione il candidato attuale 
+ * @param {*} candidate 
+ * @param {*} candidatesArr 
+ */
+function atPreviousDistance(candidate, candidatesArr) {
+  //alla prima iterazione di pathCreatorNested non abbiamo gli elementi 
+  //inseriti prima
+  "use strict";
+  if (!candidatesArr) {
+    return true;
+  }
+  else {
+    for (let i = 0; i < candidatesArr.length; i++) {
+      if (candidate.source === candidatesArr[i].dest) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+/**
+ * Metodo per evitare loopback: controlla l'elemento che vogliamo inserire 
+ * nel path non punti ad un elemento presente nell'array dei paths a distanza
+ * i-1
+ * @param {*} candidate 
+ * @param {*} candidateArr 
+ */
+function foundSelfLoop(candidate, candidatesArr) {
+  "use strict";
+  if (!candidatesArr) {
+    return false;
+  }
+  else {
+    for (let i = 0; i < candidatesArr.length; i++) {
+      if (candidate.dest === candidatesArr[i].source) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+
+/**
+ * Non più usato
+ * @param {*} candidates 
+ * @param {*} element 
+ */
+function pathCreator(candidates, element, paths, path) {
+  "use strict";
+  if (!element) {
+    element = candidates[0];
+  }
+  if (!paths) {
+    paths = [];
+  }
+  if (!path) {
+    path = [];
+  }
+  let onlyEventCond = checkOnlyTerminalLeafs(candidates);
+  // condizione di terminazione
+  if (onlyEventCond) {
+    //chiude l'eventuale path in corso
+    if (path.length > 0) {
+      //path.push(candidates[candidates.length-1]);
+      paths.push(path);
+    }
+    return paths;
+  }
+  else {
+    //ottieni l'elemento puntato da "dest" di element e aggiugi element al path
+    let pointAt = getDest(element, candidates);
+    path.push(element);
+    //Se l'elemento puntato non appare nei source ma non si tratta di un nodo
+    //terminale siamo alla fine di un path: rimuovi element dai candidates e 
+    //riparti dal primo nodo non terminale
+    if (!pointAt && !isEventCondition(element)) {
+      let position = candidates.indexOf(element);
+      candidates.splice(position, 1);
+      paths.push(path);
+      path = [];
+      let newElement = getNoLeaf(candidates);
+      pathCreator(candidates, newElement, paths, path);
+    }
+    //Se l'elemento puntato non appare nei source ed è un nodo terminale, 
+    //vai avanti con il prossimo nodo non terminale senza rimuoverlo dai 
+    // candidates
+    else if (!pointAt && isEventCondition(element)) {
+      let newElement = getNextNoLeaf(candidates, path);
+      let position = candidates.indexOf(element);
+      candidates.splice(position, 1);
+      pathCreator(candidates, newElement, paths, path);
+    }
+    // Se esiste pointAt significa che siamo all'interno di un path: aggiungi
+    // l'elemento al path e rimuovilo dai candidates
+    else {
+      let position = candidates.indexOf(element);
+      candidates.splice(position, 1);
+      pathCreator(candidates, pointAt, paths, path);
+      //richiama ricorsivo con pointAt
+    }
+  }
+  return paths;
+}
+
+/**
+ * Restituisce il prossimo elemento del path, cioè il prossimo nodo non
+ * terminale che non è già presente tra le sources del path
+ * @param {*} element 
+ * @param {*} candidates 
+ */
+function getNextNoLeaf(candidates, path) {
+  "use strict";
+  for (let i = 0; i < candidates.length; i++) {
+    if (!isEventCondition(candidates[i]) && absentNonTerminalNode(candidates[i], path)) {
+      return candidates[i];
+    }
+  }
+}
+
+/**
+ * controlla se non ci sia già nel path un nodo non terminale con la stessa 
+ * source
+ * @param {*} element 
+ * @param {*} path 
+ */
+function absentNonTerminalNode(element, path) {
+  "use strict";
+  let absent = true;
+  for (let i = 0; i < path.length; i++) {
+    if (path[i].source === element.source) {
+      if (!isEventCondition(path[i])) {
+        return false;
+      }
+    }
+  }
+  return absent;
+}
+
+/**
+ * 
+ * @param {*} element 
+ * @param {*} candidates 
+ */
+function getDest(element, candidates) {
+  "use strict";
+  let results = [];
+  for (let i = 0; i < candidates.length; i++) {
+    if (candidates[i].source === element.dest) {
+      results.push(candidates[i]);
+    }
+  }
+  if (results) {
+    return results[0];
+  }
+}
+
+/**
+ * 
+ * @param {*} candidates 
+ */
+function getNoLeaf(candidates) {
+  "use strict";
+  let results = [];
+  for (let i = 0; i < candidates.length; i++) {
+    if (!isEventCondition(candidates[i])) {
+      results.push(candidates[i]);
+    }
+  }
+  if (results) {
+    return results[0];
+  }
+}
+
+/**
+ * salva l'edge tra source e dest incrementando l'indice in posizione [s][d] 
+ * nella matrice passata come arg
+ * @param {*} origin 
+ * @param {*} source 
+ * @param {*} matrix 
+ */
+function increaseLinkCount(source, dest, linkArr) {
+  "use strict";
+  console.log("increasing matrix from", source, "to ", dest);
+  for (let i = 0; i < linkArr.length; i++) {
+    if (linkArr[i].source === source && linkArr[i].dest === dest) {
+      linkArr[i].value++;
+      return linkArr;
+    }
+  }
+  let newEntry = {
+    "source": source,
+    "dest": dest,
+    value: 1
+  };
+  linkArr.push(newEntry);
+  return linkArr;
+  /*
+  let firstRow = matrix[0];
+  let sourceIndex = firstRow.indexOf(source);
+  let destIndex = firstRow.indexOf(dest);
+  matrix[sourceIndex][destIndex]++;
+  console.log("resulting matrix: ", matrix);
+  return matrix;
+  */
+}
+
+/**
+ * salva l'edge tra source e dest incrementando l'indice in posizione [s][d] 
+ * nella matrice passata come arg
+ * @param {*} origin 
+ * @param {*} source 
+ * @param {*} matrix 
+ */
+function increaseMatrixCount(source, dest, matrix) {
+  "use strict";
+  console.log("increasing matrix from", source, "to ", dest);
+  let firstRow = matrix[0];
+  let sourceIndex = firstRow.indexOf(source);
+  let destIndex = firstRow.indexOf(dest);
+  matrix[sourceIndex][destIndex]++;
+  console.log("resulting matrix: ", matrix);
+  return matrix;
+}
+
+/**
+ * Unisce la vecchia matrice con quella corrente, invia al db 
+ * @param {*} oldMatrix 
+ * @param {*} currentMatrix 
+ */
+function mergeMatrixes(oldMatrix, currentMatrix) {
+  "use strict";
+  let newMatrix = [...oldMatrix];
+  for (let i = 0; i < currentMatrix.length; i++) {
+    let found = false;
+    for (let j = 0; j < newMatrix.length; j++) {
+      if (currentMatrix[i].source === newMatrix[j].source &&
+        currentMatrix[i].dest === newMatrix[j].dest) {
+        newMatrix[j].value++;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      newMatrix.push(currentMatrix[i]);
+    }
+  }
+  console.log("MATRIXES MERGED!", newMatrix);
+  return newMatrix;
+}
+
+/**
+ * Funzione che trasforma una struttura DOM di elementi xml in una matrice di adiacenza.
+ * I nodi della matrice sono gli elementi di tipo block, i vertici tra i nodi sono estratti
+ * dai tag next (vertice tra blocco precedente e successivo), value (stesso), statement (collega
+ * il blocco precedente a tutti i blocchi presenti all'interno dello statement)
+ * @param {*} xml 
+ */
+function createTriggerMatrix(xml, workspace) {
+  "use strict";
+  let allElements = xml.querySelectorAll("block");
+  let allNames = [];
+
+  for (let i = 0; i < allElements.length; i++) {
+    allNames.push(allElements[i].getAttribute("type"));
+  }
+
+  let linkArray = [];
+
+  for (let i = 0; i < allElements.length; i++) {
+    //console.log(allElements[i]);
+    console.log("HTML: ", allElements[i].outerHTML);
+    let myType = allElements[i].getAttribute('type');
+    let myId = allElements[i].getAttribute('id');
+    console.log("myType:", myType);
+    let block = workspace.getBlockById(myId);
+    console.log(block);
+    let myChildren = block.getChildren();
+    if (myChildren && myChildren.length > 0) {
+      for (let j = 0; j < myChildren.length; j++) {
+        let childType = myChildren[j].type;
+        linkArray = increaseLinkCount(myType, childType, linkArray);
+        //taggedMatrix = increaseMatrixCount(myType, childType, taggedMatrix);
+      }
+    }
+    console.log("LINK ARR!!", linkArray);
+  }
+
+  //console.log("final matrix: ", taggedMatrix);
+  //return taggedMatrix;
+  return linkArray;
+}
+
+/**
+ * 
+ * @param {*} candidateList 
+ */
+function checkOnlyTerminalLeafs(candidateList) {
+  "use strict";
+  let onlyEventCond = true;
+  for (let i = 0; i < candidateList.length; i++) {
+    // aggiungere date e time
+    if (candidateList[i].dest !== "condition" || candidateList[i] !== "event") {
+      onlyEventCond = false;
+      break;
+    }
+  }
+  return onlyEventCond;
+}
+
+/**
+ * Ordina la lista dei candidati in base al peso dei link ("value")
+ * @param {*} candidatesList 
+ */
+function sortCandidatesList(candidatesList) {
+  "use strict";
+  console.log("sorting!", candidatesList);
+  candidatesList.sort(function (a, b) {
+    if (a.value > b.value) {
+      return -1;
+    }
+    if (a.value < b.value) {
+      return 1;
+    }
+    return 0;
+  });
+  console.log("sorted!", candidatesList);
+  return candidatesList;
+}
+
+/**
+ * Rimuove dalla lista dei candidati i collegamenti che puntano verso group,
+ * poichè non verranno usati per costruire best path (come gestire nesting?)
+ * @param {*} candidatesList 
+ */
+function filterCandidatesList(candidatesList) {
+  "use strict";
+  let filtered = candidatesList.filter(function (e) {
+    return (e.source !== "group" && e.destination !== "group");
+  });
+  return filtered;
+}
+
+
+/**
+ * Unisce i singoli graph delle regole prelevati dal db
+ * @param {*} graphsArr 
+ */
+function createMergedGraph(graphsArr) {
+  "use strict";
+  let startArray = [];
+  let flattedArray = [];
+  for (let i = 0; i < graphsArr.length; i++) {
+    startArray.push(JSON.parse(graphsArr[i].graph));
+  }
+
+  for (let i = 0; i < startArray[0].length; i++) {
+    flattedArray.push(startArray[0][i]);
+  }
+
+  for (let i = 1; i < startArray.length; i++) {
+    for (let j = 0; j < startArray[i].length; j++) {
+      let found = false;
+      for (let k = 0; k < flattedArray.length; k++) {
+        if (startArray[i][j].source === flattedArray[k].source &&
+          startArray[i][j].dest === flattedArray[k].dest) {
+          flattedArray[k].value++;
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        flattedArray.push(startArray[i][j]);
+      }
+    }
+
+  }
+  console.log(flattedArray);
+  return flattedArray;
+}
+
+/**
+ * controllo per rendere compatibile il formato dei nomi dei trigger con quello
+ * dei blocchi
+ * @param {*} rulesMatrix 
+ */
+function checkNames(rulesMatrix) {
+  "use strict";
+  let newRulesMatrix = [];
+  for (let i = 0; i < rulesMatrix.length; i++) {
+    if (rulesMatrix[i].source === null || rulesMatrix[i].dest === null) {
+      console.log("find a null in", rulesMatrix[i]);
+    }
+    else {
+
+      if (rulesMatrix[i].source === "AND") {
+        rulesMatrix[i].source = "and";
+      }
+      else if (rulesMatrix[i].source === "OR") {
+        rulesMatrix[i].source = "or";
+      }
+      else if (rulesMatrix[i].source === "not") {
+        rulesMatrix[i].source = "not_dynamic";
+      }
+      else if (rulesMatrix[i].source === "time") {
+        rulesMatrix[i].source = "hour_min";
+      }
+      else if (rulesMatrix[i].source === "date") {
+        rulesMatrix[i].source = "day";
+      }
+
+
+      if (rulesMatrix[i].dest === null) {
+        rulesMatrix.splice(i, 1);
+      }
+      else if (rulesMatrix[i].dest === "AND") {
+        rulesMatrix[i].dest = "and";
+      }
+      else if (rulesMatrix[i].dest === "OR") {
+        rulesMatrix[i].dest = "or";
+      }
+      else if (rulesMatrix[i].dest === "not") {
+        rulesMatrix[i].dest = "not_dynamic";
+      }
+      else if (rulesMatrix[i].dest === "time") {
+        rulesMatrix[i].dest = "hour_min";
+      }
+      else if (rulesMatrix[i].dest === "date") {
+        rulesMatrix[i].dest = "day";
+      }
+      newRulesMatrix.push(rulesMatrix[i]);
+    }
+  }
+  return newRulesMatrix;
+}
+
+
+
+/**
+ * Cerca qual'è il punto di partenza più indicato, guardando al nodo con più
+ * collegamenti tra quelli passati come possibili punti iniziali
+ * @param {*} startingNodes 
+ */
+function getBestStartingPoint(candidates, startingNodes) {
+  "use strict";
+  if (startingNodes.length === 1) {
+    return startingNodes[0];
+  }
+  let max;
+  let maxValue = -1;
+  for (let i = 0; i < startingNodes.length; i++) {
+    for (let j = 0; j < candidates.length; j++) {
+      if (startingNodes.includes(candidates[j].source) &&
+        candidates[j].value > maxValue &&
+        (candidates[j].dest === "event" || candidates[j].dest === "condition")) {
+        max = candidates[j].source;
+        maxValue = candidates[j].value;
+      }
+    }
+  }
+  return max;
+}
+
+/**
+ * Cerca qual'è il punto di partenza più indicato, guardando al nodo con più
+ * collegamenti tra quelli passati come possibili punti iniziali
+ * @param {*} startingNodes 
+ */
+function getBestStartingPointOld(candidates, startingNodes) {
+  "use strict";
+  if (startingNodes.length === 1) {
+    return startingNodes[0];
+  }
+  let max;
+  let maxValue = -1;
+  for (let i = 0; i < startingNodes.length; i++) {
+    for (let j = 0; j < candidates[0].length; j++) {
+      if (startingNodes.includes(candidates[0][j].source) &&
+        candidates[0][j].value > maxValue &&
+        (candidates[0][j].dest === "event" || candidates[0][j].dest === "condition")) {
+        max = candidates[0][j].source;
+        maxValue = candidates[0][j].value;
+      }
+    }
+  }
+  return max;
+}
+
 
 

@@ -1671,18 +1671,19 @@ export function getActionInfo() {
  * @param {*} triggerInfo
  */
 export function getTriggerCategory(triggerName) {
-  //console.log(triggerName);
+  "use strict";
   // per non contare più volte i trigger composti da relativePosition e pointOfInterest
   if (triggerName === "relativePosition-pointOfInterest") {
     return;
   }
   const triggerInfo = getTriggerInfo();
-  //console.log(triggerInfo);
   const myData = triggerInfo.find(function (e) {
     return e.fullName === triggerName;
   });
-  const myCategory = myData.categoryName;
-  //console.log(myCategory);
+  let myCategory;
+  if (myData && myData.categoryName){
+    myCategory = myData.categoryName;
+  }
   return myCategory;
 }
 
@@ -1692,6 +1693,7 @@ export function getTriggerCategory(triggerName) {
  * @param {*} triggerInfo 
  */
 export function getTriggerWithMyCategory(myCategory) {
+  "use strict";
   const triggerInfo = getTriggerInfo();
   const triggersWithMyCategory = triggerInfo.filter(function (e) {
     return e.categoryName === myCategory;

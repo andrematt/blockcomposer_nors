@@ -2,7 +2,7 @@ import { getUserName, getWorkspace, getTriggerInfo, getHighlightedRule,
          createRuleBlocksObj, createRuleBlocksStr, getTriggerWithMyCategory,
          getActionInfo 
         } from "./main.js";
-import {generateMatrixFromRule} from "./blockSuggestor.js";
+import {generateGraphFromRule} from "./blockSuggestor.js";
 import {getLoggedUser} from "./login.js";
 import {printPassedError} from "./compositionErrorMessages.js";
 import {createUpdateAction, getFirstNextOperator, haveSameOperator, 
@@ -200,8 +200,9 @@ export async function saveRuleInDB() {
   let blocksDb = myWorkspace.blockDB_;
   let rule_obj = makeRuleObj(blocksDb, false, id);
   let rule_obj_str = JSON.stringify(rule_obj);
-  //let rule_xml_str = new XMLSerializer().serializeToString(rule_xml);
-  let rule_graph = generateMatrixFromRule(myWorkspace);
+  //let rule_xml_str = new XMLSerializer().serializeToString(rule_xml); 
+  //let rule_graph = generateMatrixFromRule(myWorkspace); decommenta queste per usare il vecchio RS
+  let rule_graph = generateGraphFromRule(rule_obj);
   console.log(rule_graph);
   let rule_graph_str = JSON.stringify(rule_graph);
   console.log(rule_graph_str);
@@ -349,6 +350,7 @@ export async function getGraphsFromDB(triggerName){
  * Get di tutte le regole dal db usando async/await
  */
 export async function getAllFromDB() {
+  "use strict";
   let result;
   //let user = getLoggedUser();
   let user = "allUsers";
@@ -1131,12 +1133,12 @@ function makeRuleObj(blockDb, isUpdate, id) {
 export function sendRulesToNode(rule) {
   // TODO triggers deve avere il campo isNot, da inserire quando la regola viene salvata
   "use strict";
-  let ruleFromSaveAndApply = JSON.parse(rule[0].rule_obj_str);
-  let id = ruleFromSaveAndApply.id;
+  let ruleToActivate = JSON.parse(rule[0].rule_obj_str);
+  let id = ruleToActivate.id;
   console.log("sendRulesToAE");
   //protocols & address check
   if (GLOBALS.nodeUrl === '') {
-      printPassedError("no_node_adress");
+      printPassedError("no_node_address");
       return;
   }
 
@@ -1174,45 +1176,43 @@ export function sendRulesToNode(rule) {
   };
   let ruleSelectedOrDeleted = false;
   let tmpRule; 
-  let priority = ruleFromSaveAndApply.priority;
+  let priority = ruleToActivate.priority;
   // adesso se non viene specificata invia ""
   if (priority === undefined || priority === 0 || priority === "") {
       priority = 1;
   }
   
-  //activate rule from "save and apply" button"
-  if (ruleFromSaveAndApply) {
-      //var natLanguage = naturalNL.getNl(true, true);
+  if (ruleToActivate) {
       ruleSelectedOrDeleted = true;
       tmpRule = {
-          name: ruleFromSaveAndApply.ruleName, //"rule" + i,
+          name: ruleToActivate.ruleName, //"rule" + i,
           id: id, //Keep the same ID from the local database
           originalId: id, 
-          naturalLanguage: GLOBALS.currentNl,
-          actionMode: ruleFromSaveAndApply.actionMode,
+          naturalLanguage: "not used",
+          actionMode: ruleToActivate.actionMode,
           priority: priority,
           actionOrRuleOrBlockReference: []
       };
       
-          for (let j = 0; j < ruleFromSaveAndApply.triggers.length; j++) {
-              if (ruleFromSaveAndApply.triggers[j].notValue && ruleFromSaveAndApply.triggers[j].notValue.length > 0 && (ruleFromSaveAndApply.triggers[j].notValue[2]!==null && ruleFromSaveAndApply.triggers[j].notValue[3]!==null)) {
-                  ruleFromSaveAndApply.triggers[j].triggerType = "event"; //trasformo i trigger in event se una condizione ha il not e se ha settati i parametri dell'orario
+          for (let j = 0; j < ruleToActivate.triggers.length; j++) {
+              if (ruleToActivate.triggers[j].notValue && ruleToActivate.triggers[j].notValue.length > 0 && (ruleToActivate.triggers[j].notValue[2]!==null && ruleToActivate.triggers[j].notValue[3]!==null)) {
+                  ruleToActivate.triggers[j].triggerType = "event"; //trasformo i trigger in event se una condizione ha il not e se ha settati i parametri dell'orario
               }
-              else if (ruleFromSaveAndApply.triggers[j].element.realName === "typeOfProximity") {
-                  ruleFromSaveAndApply.triggers[j].triggerType = "event" //trasformo i trigger "typeOfProxymity" in event
+              else if (ruleToActivate.triggers[j].element.realName === "typeOfProximity") {
+                  ruleToActivate.triggers[j].triggerType = "event"; //trasformo i trigger "typeOfProxymity" in event
               }
-              else if (ruleFromSaveAndApply.triggers[j].element.realName === "pointOfInterest"){
-                  ruleFromSaveAndApply.triggers[j].triggerType = "condition"; //trasformo i trigger "pointOfInterest" in condition
+              else if (ruleToActivate.triggers[j].element.realName === "pointOfInterest"){
+                  ruleToActivate.triggers[j].triggerType = "condition"; //trasformo i trigger "pointOfInterest" in condition
               }                
           }
           
           var eventsLen = 0;
           var conditionsLen = 0;
-          for(let i=0; i<ruleFromSaveAndApply.triggers.length; i++){
-              if(ruleFromSaveAndApply.triggers[i].triggerType === "event"){
+          for(let i=0; i<ruleToActivate.triggers.length; i++){
+              if(ruleToActivate.triggers[i].triggerType === "event"){
                   eventsLen++;
               }
-              else if(ruleFromSaveAndApply.triggers[i].triggerType === "condition"){
+              else if(ruleToActivate.triggers[i].triggerType === "condition"){
                   conditionsLen++;
               }
           };
@@ -1221,12 +1221,12 @@ export function sendRulesToNode(rule) {
           let transformedConditions;
           
           if(eventsLen>0){
-              transformedEvents = transformEventsNew(ruleFromSaveAndApply.triggers, eventsLen, conditionsLen); 
-              //tmpRule.event = transformEventsNew(ruleFromSaveAndApply.triggers, eventsLen, conditionsLen); 
+              transformedEvents = transformEventsNew(ruleToActivate.triggers, eventsLen, conditionsLen); 
+              //tmpRule.event = transformEventsNew(ruleToActivate.triggers, eventsLen, conditionsLen); 
           }
           if(conditionsLen>0){
-              transformedConditions = transformConditionsNew(ruleFromSaveAndApply.triggers, eventsLen, conditionsLen);
-              //tmpRule.condition = transformConditionsNew(ruleFromSaveAndApply.triggers, eventsLen, conditionsLen);
+              transformedConditions = transformConditionsNew(ruleToActivate.triggers, eventsLen, conditionsLen);
+              //tmpRule.condition = transformConditionsNew(ruleToActivate.triggers, eventsLen, conditionsLen);
           }
           
           //No transformed events or conditions to send to Rule Manager
@@ -1243,9 +1243,9 @@ export function sendRulesToNode(rule) {
           if(typeof transformedConditions !== "undefined" && transformedConditions!== null){
               tmpRule.condition = transformedConditions;
           }
-          //transformEvents(ruleFromSaveAndApply.triggers) !== null ? tmpRule.event = transformEvents(ruleFromSaveAndApply.triggers) : null; //Prima lo esegue per vedere se è null e poi lo esegue per assegnarlo?
-          //transformConditions(ruleFromSaveAndApply.triggers) !== null ? tmpRule.condition = transformConditions(ruleFromSaveAndApply.triggers) : null;
-          tmpRule.actionOrRuleOrBlockReference.push(transformActions(ruleFromSaveAndApply.actions));
+          //transformEvents(ruleToActivate.triggers) !== null ? tmpRule.event = transformEvents(ruleToActivate.triggers) : null; //Prima lo esegue per vedere se è null e poi lo esegue per assegnarlo?
+          //transformConditions(ruleToActivate.triggers) !== null ? tmpRule.condition = transformConditions(ruleToActivate.triggers) : null;
+          tmpRule.actionOrRuleOrBlockReference.push(transformActions(ruleToActivate.actions));
           
       ruleModelObj.rule.push(tmpRule);
   } 
@@ -1683,7 +1683,8 @@ function getRealOperator(op) {
 }
 
 function getRealType(type) {
-  var toRet = type.replace("custom:", "");
+  "use strict";
+  let toRet = type.replace("custom:", "");
   toRet = toRet.replace("tns:", "");
   switch (toRet) {
       case "int":
