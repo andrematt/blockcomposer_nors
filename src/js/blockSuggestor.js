@@ -427,7 +427,9 @@ flags.examinedAllTriggers = checkOtherAvailableTrigger(flags, ruleObj.triggers);
 flags.examinedAllActions = checkOtherAvailableAction(flags, ruleObj.actions);
 
 if(flags.examinedAllTriggers === true && flags.examinedAllActions === true){
-  currentEntry.dest = "END";
+  currentEntry.dest = {
+    value: "END"
+  };
   ruleGraph.push(currentEntry);
   return ruleGraph;
 }
