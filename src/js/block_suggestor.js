@@ -1,116 +1,9 @@
 import * as Main from "./main.js";
 import {
-  getUserGraphs, retreiveMatrixDB, saveMatrixDB,
-  updateMatrixDB
+  getUserGraphs, getNextBlockTrigger, getNextBlockAction, create_UUID, 
 } from "./database_functs.js";
-
-/**
- * 
- * @param {*} matrix 
- */
-export async function addCurrentMatrixToGlobalMatrix(matrix) {
-  "use strict";
-  let result = await retreiveMatrixDB().then();
-  // non è presente nel database: invio la matrix corrente
-  if (!result || result.length === 0) {
-    console.log("non presente in db");
-    saveMatrixDB(matrix);
-  }
-  // se è presente aggiungo la matrix corrente a quella già nel db
-  else {
-    console.log("presente in db!");
-    let oldMatrix = result[0].rules_matrix;
-    let id = result[0].id;
-    let oldMatrixArr = JSON.parse(oldMatrix);
-    if (oldMatrixArr && matrix) {
-      let merged = mergeMatrixes(oldMatrixArr, matrix);
-      updateMatrixDB(id, merged);
-    }
-  }
-  return;
-}
-
-/**
- * 
- * @param {*} suggestionList 
- */
-export function concludePath(suggestionList, initialPathList) {
-  "use strict";
-  let last = suggestionList[suggestionList.length - 1];
-  // isTrigger
-  let triggerSupportBlocks = Main.getTriggerSupportBlocks();
-  console.log(triggerSupportBlocks);
-  console.log(last);
-  if (!triggerSupportBlocks.includes(last.dest)) {
-    for (let i = 0; i < initialPathList.length; i++) {
-      if (initialPathList[i].source === last.dest && (
-        initialPathList[i].dest === "event" ||
-        initialPathList[i].dest === "condition")) {
-        // Posso direttamente aggiungere il primo match perchè sono ordinati per value
-        suggestionList.push(initialPathList[i]);
-        return suggestionList;
-      }
-    }
-  }
-  return suggestionList;
-}
-
-/**
- * Restituisce il path con peso maggiore. Non più usato: viene direttamente creato
- * un solo path
- * @param {*} suggestionList 
- */
-export function returnBestSuggestion(suggestionList) {
-  "use strict";
-  console.log("not sorted list: ", suggestionList);
-  let maxIndex = 0;
-  let maxValue = 0;
-  //const highest = suggestionList.reduce(function (a, b)  b.value - a.value)[0];
-  suggestionList.forEach(function (e, i) {
-    let localSum = 0;
-    for (let j = 0; j < e.length; j++) {
-      localSum += e[j].value;
-    }
-    if (localSum > maxValue) {
-      maxValue = localSum;
-      maxIndex = i;
-    }
-  });
-  console.log("max index:", maxIndex);
-  return suggestionList[maxIndex];
-}
-
-
-
-/**
- * non usata
- * @param {*} passedGraphs 
- * @param {*} firstTrigger 
- */
-export function generateSuggestionsCategory(passedGraphs, firstTrigger) {
-  "use strict";
-  const triggerInfo = Main.getTriggerInfo();
-  const myCategory = Main.getTriggerCategory(firstTrigger, triggerInfo);
-  console.log(myCategory);
-  if (typeof passedGraphs === "undefined" || passedGraphs.length === 0) {
-    return;
-  }
-
-  let objResult = {
-    initialPathList: [],
-    candidates: new Set(),
-    resultPathList: []
-  };
-
-  let rulesMatrix = createMergedGraph(passedGraphs);
-  rulesMatrix = checkNames(rulesMatrix);
-  let threshold = 0;
-  let max_dist = 4;
-  let allRulesMatrixEntriesObj = sortCandidatesList(rulesMatrix);
-  let rulesMatrixEntriesObj = filterCandidatesList(allRulesMatrixEntriesObj);
-  objResult.initialPathList = rulesMatrixEntriesObj;
-
-}
+import { ruleBlockChangesListener } from "./listeners.js";
+import {dimensionIdTranslator} from "./utils.js"
 
 
 /**
@@ -367,6 +260,122 @@ const checkOtherAvailableAction = (flags, actions) => {
   "use strict";
   return flags.actionToExamine >= actions.length ? true : false;
 };
+
+function getNextTriggerOp(triggerList, i){
+  if(i >= triggerList.length - 1){
+    return("none");
+  }
+  else {
+    return(triggerList[i+1].nextOperator);
+  }
+}
+
+function getNegation(trigger){
+  if (!trigger.isNot){
+    return ("none");
+  }
+  else {
+    if(trigger.notValue.length === 0){
+      return ("negation without time");
+    }
+    else {
+      return ("negation with time");
+    }
+  }
+}
+
+/**
+ * 
+ * @param {*} trigger 
+ */
+function getTriggerFullName(trigger){
+  console.log(trigger);
+  let translatedDimId = dimensionIdTranslator(trigger.element.dimensionId);
+  return(translatedDimId);
+}
+
+/**
+ * Used to translate a singole rule obj in element/att format. 
+ * Used by neural network model in prediction phase (same as train but without 
+ * the "nextElement" attribute field).
+ * @param {*} ruleElement 
+ * @param {*} elementType 
+ */
+export const generateElementAttFromRuleElement = (ruleElement, elementType) => {
+  if(elementType === "trigger"){
+    let trigger = 
+    {//elementName: getTriggerFullName(ruleObj.triggers[i]), 
+      elementName: ruleElement.type, 
+      elementType : "trigger",
+      triggerType : ruleElement.triggerType,
+      actionType: "none",
+      nextOp: ruleElement.nextOperator, 
+      negation: getNegation(ruleElement)
+    };
+    return trigger;
+  }
+  else if (elementType === "action"){
+    let action = {
+      elementName: ruleElement.action.realName, 
+      elementType : "action", 
+      triggerType: "none",
+      actionType: ruleElement.timing,
+      nextOp: ruleElement.operator,
+      negation: "none" 
+    }
+    return action;
+  }
+  return false;
+};
+
+/**
+ * Built and returns the element/attribute table of a rule.
+ * Used to store data in the format used by the neural network model for train.  
+ * @param {*} workspace 
+ */ 
+export const generateElementAttributeTable = (id, ruleObj) => {
+console.log(ruleObj);
+let triggerList = Main.getTriggerInfo();
+console.log(triggerList);
+let ruleElementAttributeTable = [];
+let triggers = [];
+let actions = [];
+
+for(let i = 0; i < ruleObj.triggers.length; i++){
+triggers.push(
+  {//elementName: getTriggerFullName(ruleObj.triggers[i]), 
+   id : create_UUID(),
+   referredRule: id, 
+   elementName: ruleObj.triggers[i].type, 
+   elementType : "trigger",
+   triggerType : ruleObj.triggers[i].triggerType,
+   actionType: "none",
+   nextOp: ruleObj.triggers[i].nextOperator,
+   nextElement: ruleObj.triggers[i].nextElement,
+   negation: getNegation(ruleObj.triggers[i])
+  });
+}
+ruleElementAttributeTable.push(...triggers);
+
+for(let i = 0; i < ruleObj.actions.length; i++){
+  actions.push(
+  {
+   id : create_UUID(),
+   referredRule: id, 
+   elementName: ruleObj.actions[i].action.realName, 
+   type : "action", 
+   elementType : "action",
+   triggerType : "none",
+   actionType: ruleObj.actions[i].timing,
+   nextOp: ruleObj.actions[i].operator,
+   nextElement: ruleObj.actions[i].nextElement,
+   negation: "none" 
+  });
+}
+ruleElementAttributeTable.push(...actions); 
+console.log(ruleElementAttributeTable);
+return ruleElementAttributeTable;
+}
 
 /**
  * Built and returns the graph of a rule. The general structure of a entry 

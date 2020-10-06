@@ -1,23 +1,26 @@
 import {
     getWorkspace, checkInTriggerInfo, getTriggerList, getAllTriggerInWorkspace,
-    getBlockType, enable_after, disable_after, setTriggerList, getActionList,
+    getBlockType, setTriggerList, getActionList,
     setActionList, getRuleBlock, hasTriggerChild, getOperatorWithoutNextConn,
     checkIfTriggerOperator, getTriggerWithNoNextConnection, checkIfAction,
-    getNextViableBlockForAction, hasActionChild, fireSuggestion
+    getNextViableBlockForAction, hasActionChild 
   } from "./main.js";
 
 
   const availableConnections = {
-    ACTIONS : ["action", "parallel_dynamic"],
+    ACTIONS : ["action", "parallel_dynamic", "action_placeholder"], 
     TRIGGERS : ["trigger", "group"],
   };
 
   const availableNextStatements = {
     trigger : ["and", "or", "group", "not_dynamic"],
+    action: ["parallel_dynamic", "sequential", "parallel"],
     and : ["trigger"],
     or : ["trigger"],
     group : ["trigger"],
     parallel_dynamic : ["action"],
+    sequential: ["action"],
+    parallel: ["action"],
     action_placeholder : ["action"]
   }
 
@@ -42,8 +45,7 @@ import {
     }
   }
 
-  //for (var idx = 0; idx < block.inputList.length; idx++) {
-    for (var idx = 0; idx < inputs.length; idx++) {  
+  for (var idx = 0; idx < inputs.length; idx++) {  
     if (inputs[idx].connection === parentConnection) {
       parentInput = inputs[idx];
       break;
@@ -51,10 +53,13 @@ import {
   }
   return parentInput;
 }
+  
 
-    /**
-     * Returns true if the connection to parent element is legal
-     */ 
+/**
+   * Returns true if the connection to parent element is legal
+   * @param {*} child 
+   * @param {*} parentBlock 
+   */
   export function checkConnection(child, parentBlock) {     
       // if is a "rule" type block, check the inputs. Else, check the next 
       // statement
@@ -69,6 +74,7 @@ import {
       }
       else {
         if(availableNextStatements[parentBlock.blockType] && availableNextStatements[parentBlock.blockType].includes(child.blockType)){
+          //TODO: make a check to prevent nested sequential inside parallel block 
           return true;
         }
         else {

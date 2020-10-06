@@ -2,11 +2,65 @@ import { getAllFromDB, getOneFromDB } from "./database_functs.js";
 import { forceWorkspaceReload } from "./extensions.js";
 import {
   actionStrToObj, getWorkspace, getSuggestionWorkspace, getHighlightedRule, 
-  removeUnusedParallel, getRuleBlock
+  removeUnusedParallel, getRuleBlock, blockToDom, checkInActionInfoOnlyName,
+  checkInTriggerInfoWithName
 }
   from "./main.js";
 
 
+/**
+ * Updates the block and the XML of a trigger, when the negation is added via 
+ * textbox 
+ * @param {*} block 
+ */
+export function addNegationToBlock(block){
+  console.log("ADD NEGATION TO BLOCK")
+  let xml = blockToDom(block); //when updating a block "from the outside" (not using listeners..), you need to update
+  xml.setAttribute('not_input', true); //also the xml of the block
+  block.domToMutation(xml);
+  let inputField = block.getField("not_input");
+  inputField.setValue(true);
+  block.render();
+}
+
+/**
+ * 
+ * @param {*} block 
+ * @param {*} operator 
+ */
+export function addOperatorToBlock(block, operator){
+  let workspace = getWorkspace();
+  let blockToAppend = workspace.newBlock(operator);
+  blockToAppend.initSvg();
+  blockToAppend.render();
+  let blockConnection = block.nextConnection;
+  let otherConnection = blockToAppend.previousConnection;
+  blockConnection.connect(otherConnection);
+}
+
+/**
+ * 
+ * @param {*} block 
+ */
+export function moveSingleBlockToMain(block){
+  "use strict";
+  let firstWorkspace = getWorkspace();
+  let secondWorkspace = getSuggestionWorkspace();
+  let suggestedBlock = firstWorkspace.newBlock(block.type);
+  suggestedBlock.initSvg();
+  suggestedBlock.render();
+  block.dispose();
+  //let xml_str = rule[0].rule_xml_str;
+    //let xmlDoc = new DOMParser().parseFromString(xml_str, "text/xml");
+    //console.log(xmlDoc);
+    //Blockly.Xml.domToWorkspace(xmlDoc.firstChild, workspace);
+  }
+
+  /**
+   * 
+   * @param {*} triggerXml 
+   * @param {*} actionXml 
+   */
 export function appendFullRuleToSuggestions(triggerXml, actionXml) {
   "use strict";
   let baseXml = `
@@ -253,5 +307,60 @@ export function createActionBlocksFromSuggested(rule) {
     }
     var xmlText = new XMLSerializer().serializeToString(doc);
     return xmlText;
+  }
+}
+
+/**
+ * Create the blocks associated to the obtained suggestions
+ * @param {*} rule 
+ */
+/*
+export function createBlocksFromSuggested(suggestions) {
+  "use strict";
+   let doc = document.implementation.createDocument("", "", null);
+   for (let i = 0; i < suggestions.length; i++) {
+    if (i === 0) {
+        let newBlock = doc.createElement("block");
+        newBlock.setAttribute("type", suggestions[i]);
+        newBlock.setAttribute("class", suggestions[i]);
+        doc.appendChild(newBlock);
+      }
+    }
+    var xmlText = new XMLSerializer().serializeToString(doc);
+    return xmlText;
+}
+*/
+
+/**
+ * 
+ * @param {*} blocks 
+ */
+export function blocksToSuggestionWorkspace(blocks) {
+  "use strict";
+  console.log(blocks);
+    const workspace = getSuggestionWorkspace();
+    for (let i = 0; i < blocks.length; i++) {
+      if(checkInActionInfoOnlyName(blocks[i]) || checkInTriggerInfoWithName(blocks[i])){
+        let block = workspace.newBlock(blocks[i]);
+        //block.moveBy(0, i * 20);
+        block.initSvg();
+        block.render();
+        console.log(block);
+      }
+  }
+  alignBlocks();
+}
+
+
+/**
+ * 
+ */
+function alignBlocks(){
+  var blocks = getSuggestionWorkspace().getTopBlocks()
+  var y = 0
+  for (var i = 0; i < blocks.length; i++){
+    blocks[i].moveBy(0, y)
+    y += blocks[i].getHeightWidth().height
+    y += 10 //buffer
   }
 }

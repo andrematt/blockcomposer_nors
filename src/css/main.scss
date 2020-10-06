@@ -14,10 +14,32 @@ body{
   color: #222;
   
 }
+  
+.why-button-container{
+    display:flex;
+    height: 4vh;
+    .why-div{
+      width:25%;
+      margin-left: 75%;
+      display:flex;
+      #suggestor-why{
+        margin:auto;
+      }
+    }
+  }  
 
 .block-name {
   font-weight: bold;
 }
+
+.link-textarea {
+  color: blue;
+  cursor: pointer;
+}
+
+.link-textarea:hover{
+    text-decoration: underline;
+  }
 
 .splash-img{
   //opacity: 0.5;
@@ -159,9 +181,11 @@ form {
       }
     }
   }
-  
+ 
+
   .support-container{
     display:flex;
+    margin: 10%;
     height: 10vh;
     //margin-bottom:1vh;
     //margin-top:1vh;

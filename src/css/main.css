@@ -13,8 +13,30 @@ body {
   color: #222;
 }
 
+.why-button-container {
+  display: flex;
+  height: 4vh;
+}
+.why-button-container .why-div {
+  width: 25%;
+  margin-left: 75%;
+  display: flex;
+}
+.why-button-container .why-div #suggestor-why {
+  margin: auto;
+}
+
 .block-name {
   font-weight: bold;
+}
+
+.link-textarea {
+  color: blue;
+  cursor: pointer;
+}
+
+.link-textarea:hover {
+  text-decoration: underline;
 }
 
 .splash-img {
@@ -148,6 +170,7 @@ input:focus {
 }
 .header .support-container {
   display: flex;
+  margin: 10%;
   height: 10vh;
 }
 .header .support-container .textarea-div {

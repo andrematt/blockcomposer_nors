@@ -3,11 +3,12 @@ import * as DB from "./database_functs.js";
 import * as Generators from "./generators.js";
 import * as Listeners from "./listeners.js";
 import * as Extensions from "./extensions.js";
-import * as BlockSuggestor from "./blockSuggestor.js";
-import * as Dialog from "./custom-dialog.js";
+import * as BlockSuggestor from "./block_suggestor.js";
+import * as Dialog from "./custom_dialog.js";
 import * as DomModifiers from "./dom_modifiers.js";
-
-
+import * as errorMessages from "./textarea_manager.js";
+import * as neuralNetwork from "./neural_network.js";
+import {CPT} from "./CPT/index.js"
 
 let currentUser;
 let myTriggers;
@@ -34,7 +35,8 @@ let inconsistentActionSequence = false;
 let inconsistentActionMessage = "";
 let triggerList = [];
 let actionList = [];
-let lastTrigger; // Last trigger inserted in workspace
+let lastBlock; // Last block inserted in workspace
+let CPTmodel;
 let triggerInWorkspace = []; // keep the triggers in workspace TODO: listener for remove at delete
 // Array per le azioni composte da più parti ma da mostrare come una unità
 const multipleActions = ["Alarms", "Reminders", "video", "showImage"];
@@ -43,9 +45,9 @@ const multipleTriggers = ["relativePosition"];
 // Array per i blocchi accessori riguardanti trigger e azioni
 const triggerSupportBlocks = ["and", "or", "group", "event", "condition", "not_dynamic"];
 const triggerOperators = ["and", "or", "group"];
-const actionOperators = ["parallel_dynamic"];
+const actionOperators = ["parallel_dynamic", "sequential", "parallel"];
 const triggerTimeBlocks = ["day", "hour_min"];
-const actionSupportBlocks = ["parallel_dynamic", "action_placeholder"];
+const actionSupportBlocks = ["parallel_dynamic", "action_placeholder", "sequential", "parallel"];
 let revertPossibility = "remove";
 
 /**
@@ -57,12 +59,40 @@ let revertPossibility = "remove";
   "use strict";
   console.log(Init);
   //console.log(window.Blockly.Blocks.procedures_callnoreturn.renameProcedure("test", "test2"));
+  initializeCPT(); 
+  initializeNN(); 
   localStorageChecker();
   waitForTriggers();
   waitForActions();
   Dialog.overrideDialog();
 
 
+/**
+ * select all graphs from DB, convert them back in JS format, train the CPT 
+ * model with them.
+ */
+async function initializeCPT(){
+  "use strict"
+  let allSequences = await DB.getAllSequencesFromDB().then();
+  console.log(allSequences);
+  CPTmodel = new CPT();
+  let myData = allSequences.map( element => JSON.parse(element.rule_sequence));
+  CPTmodel.train(
+    myData // Training Data
+  );
+}
+
+/**
+ * select all the element/attribute row in the elAtt table, train the NN model
+ */
+async function initializeNN(){
+  "use strict"
+  let allElementAtt = await DB.getAllElementAttFromDB().then();
+  console.log(allElementAtt);
+  let arrayedAllElementAtt = convertElementAttInArr(allElementAtt);
+  console.log(arrayedAllElementAtt);
+  neuralNetwork.train(arrayedAllElementAtt);
+}
 
 
   /**
@@ -695,6 +725,9 @@ let revertPossibility = "remove";
       },
       domToMutation: function (xmlElement) {
         let hasNotInput = (xmlElement.getAttribute('not_input') == 'true');
+        console.log("CHANGING FORM!");
+        console.log(xmlElement);
+        console.log(xmlElement.getAttribute('not_input'));
         // Updateshape è una helper function: non deve essere chiamata direttamente ma 
         // tramite domToMutation, altrimenti non viene registrato che il numero di 
         // inputs è stato modificato
@@ -750,6 +783,8 @@ let revertPossibility = "remove";
   </category>
   <sep gap = "8"></sep>
   <category name="Action operators" colour="150">
+    <block type="sequential"></block>
+    <block type="parallel"></block>
     <block type="parallel_dynamic"></block>
   </category>
   <sep gap = "8"></sep>
@@ -948,7 +983,7 @@ let revertPossibility = "remove";
 
 
   goog.require('Blockly.FieldDate');
-  var workspace = Blockly.inject('main-workspace-div',
+  let workspace = Blockly.inject('main-workspace-div',
     {
       //setup e iniezione della toolbox
       toolbox: document.getElementById('toolbox'),
@@ -977,7 +1012,7 @@ let revertPossibility = "remove";
       renderer: 'zelos'
     });
 
-  var suggestionWorkspace = Blockly.inject('suggestion-workspace-div',
+  let suggestionWorkspace = Blockly.inject('suggestion-workspace-div',
     {
       //setup e iniezione della toolbox
       zoom: {
@@ -1018,8 +1053,10 @@ let revertPossibility = "remove";
   //workspace.addChangeListener(Listeners.triggerTypeListenerParent);
   
   //workspace.addChangeListener(Listeners.addToCorrectBlock);
-  //workspace.addChangeListener(Listeners.lastTriggerListener); //Non viene più usato perché la raccomandazione viene eseguita dopo il controllo sulla correttezza della regola
-  workspace.addChangeListener(Listeners.notBlockUpdate);
+  // Main workspace listeners 
+
+
+  workspace.addChangeListener(Listeners.lastTriggerActionListener); 
   workspace.addChangeListener(Listeners.notBlockUpdate);
   workspace.addChangeListener(Listeners.triggerTypeListenerChild);
   workspace.addChangeListener(Listeners.blockDisconnectListener);
@@ -1029,26 +1066,18 @@ let revertPossibility = "remove";
   workspace.addChangeListener(Listeners.updateCodeListener);
   workspace.addChangeListener(Listeners.blockDocsListener);
   workspace.addChangeListener(Listeners.ruleTypeListener);
+  workspace.addChangeListener(Listeners.removeUnusedNotBlocks);
+  //workspace.addChangeListener(Listeners.addedTriggerOpToWorkspace);
+  //workspace.addChangeListener(Listeners.addedActionOpToWorkspace);
   workspace.addChangeListener(Listeners.autoCheckRule);
 
+  //suggestion workspace listeners
+  suggestionWorkspace.addChangeListener(Listeners.secondaryWorkspaceLeftClick);
+  
   myWorkspace = workspace;
   mySuggestionWorkspace = suggestionWorkspace;
 })();
 
-/**
- * Fire a reccomandation after the autoChecker has check the correcteness of the rule
- */ 
-export function fireSuggestion(block){
-  "use strict";
-  console.log("FIRE A RECOMMANDATION");
-  console.log(ruleBlocksArr);
-  let lastTrigger = getLastTrigger();
-  if(lastTrigger !== block.type) {
-    setLastTrigger(block.type);
-    clearSuggestionWorkspace();
-    exportSuggestorRule();
-  }
-}
 
 /**
  * Costruisce la regola in formato blocco a partire dalla lista di suggerimenti
@@ -1328,65 +1357,363 @@ function getFirstTrigger() {
   }
 }
 
-
 /**
- * Stampa sull'area dei messaggi il tipo di errore avvenuto
- * @param {*} errorType 
+ * Gets all "trigger" and "action" elements in the workspace
  */
-function suggestorErrorMessages(errorType) {
-  if (errorType === "noFirstTrigger") {
-    let text = "Could not create suggestion for this block type. Suggestions will be created if the first element in the 'trigger' section of 'rule' block is a trigger.";
-    document.getElementById('textarea-2').innerHTML = "";
-    document.getElementById('textarea-2').innerHTML = text;
+export function getElementsInWorkspace(){
+  let ws = getWorkspace();
+  //ottiene tutti i blocchi dal workspace, ordinati secondo la posizione
+  let blocks  = ws.getAllBlocks(true);
+  const triggerInfo = getTriggerInfo();
+  const actionInfo = getActionInfo();
+  let ruleElements = {};
+  let triggers = [];
+  let actions = [];
+  let elements;
+  for(let i = 0; i < blocks.length; i++){
+    let type = blocks[i].type;
+    let triggerEntry = triggerInfo.find((o, i) => {
+      if (o.fullName === type) {
+        return o;
+      }
+    });
+    if (triggerEntry) {
+      triggers.push(triggerEntry.fullName);
+      continue;
+    }
+    let actionEntry = actionInfo.find((o, i) => {
+      if (o.fullName === type) {
+        return o;
+      }
+    });
+    if (actionEntry) {
+      actions.push(actionEntry.fullName);
+    }
+  };
+  ruleElements.triggers = triggers;
+  ruleElements.actions = actions;
+  elements = triggers.concat(actions);
+  ruleElements.elements = elements;
+  return ruleElements;
+}
+  
+/**
+ * 
+ * @param {*} linkType 
+ */
+export function startRefineRule(linkType){
+  let lastBlock = getLastBlock(); 
+  console.log(lastBlock);
+  if(linkType==="and"){
+    console.log("AND")
+    DomModifiers.addOperatorToBlock(lastBlock, linkType)
+    errorMessages.clearSuggestorTextarea();
+    ruleSuggestorManager(lastBlock, true, linkType);
   }
-  else if (errorType === "noRulesWithTrigger") {
-    let text = "Not enough rules were found for this trigger.";
-    document.getElementById('textarea-2').innerHTML = "";
-    document.getElementById('textarea-2').innerHTML = text;
+  else if(linkType==="or"){
+    DomModifiers.addOperatorToBlock(lastBlock, linkType)
+    errorMessages.clearSuggestorTextarea();
+    ruleSuggestorManager(lastBlock, true, linkType);
   }
-  else if (errorType === "noSuggestion") {
-    let text = "No suggestions were found for this trigger.";
-    document.getElementById('textarea-2').innerHTML = "";
-    document.getElementById('textarea-2').innerHTML = text;
+  else if(linkType==="not"){
+    DomModifiers.addNegationToBlock(lastBlock);
+    //errorMessages.afterNotMessage();
+    ruleSuggestorManager(lastBlock, true, linkType);
   }
-  else if (errorType === "noActionSuggestion") {
-    let text = "No actions to suggest for these triggers";
-    document.getElementById('textarea-2').innerHTML = "";
-    document.getElementById('textarea-2').innerHTML = text;
+  else if(linkType==="rule"){
+    ruleSuggestorManager(lastBlock, true, linkType);
+  }
+  else if(linkType==="sequential"){
+    DomModifiers.addOperatorToBlock(lastBlock, linkType)
+    errorMessages.clearSuggestorTextarea();
+    ruleSuggestorManager(lastBlock, true, linkType);
+  }
+  else if(linkType==="parallel"){
+    DomModifiers.addOperatorToBlock(lastBlock, linkType)
+    errorMessages.clearSuggestorTextarea();
+    ruleSuggestorManager(lastBlock, true, linkType);
+  }
+  else if(linkType==="end"){
+    errorMessages.clearSuggestorTextarea();
+    ruleSuggestorManager(lastBlock, true, linkType);
   }
 }
 
 /**
- * Ottiene il primo trigger nel blocco regola, estrae dal DB le altre regole che 
- * iniziano per quel trigger, crea la lista di suggerimenti e la trasforma in blocchi
+ * We will fire recommendation each time. Eventually, add checks here.  
+ * @param {*} block 
  */
-/*
-async function suggestorTrigger() {
-  "use strict";
-  const firstTrigger = getFirstTrigger();
-  if (!firstTrigger) {
-    suggestorErrorMessages("noFirstTrigger");
-    return;
-  }
-
-  const rulesWithFirstTrigger = await DB.getGraphsFromDB(firstTrigger).then();
-  if (!rulesWithFirstTrigger || rulesWithFirstTrigger.length === 0) {
-    suggestorErrorMessages("noRulesWithTrigger");
-    return;
-  }
-  console.log("rules with trigger: ")
-  console.log(rulesWithFirstTrigger);
-  const suggestionListObj = await BlockSuggestor.generateSuggestions(rulesWithFirstTrigger, firstTrigger).then();
-  if (!suggestionListObj || suggestionListObj.resultPathList.length === 0) {
-    suggestorErrorMessages("noSuggestion");
-    return;
-  }
-  createBlocksFromSuggested(suggestionListObj.resultPathList);
+function checkRecommendationConditions(block){
+  return true;
 }
 
-let exportSuggestorTrigger = suggestorTrigger;
-export { exportSuggestorTrigger };
-*/
+
+/**
+ * Extract elements in workspace, decide if fire a standard (only CPT) or a 
+ * refined (CPT + Neural network) suggestion on the last rule element (trigger 
+ * or action) inserted.  
+ */
+export async function ruleSuggestorManager(lastBlock, refined = false, linkType){
+  console.log("RULE SUGGESTOR MANAGER");
+  console.log(lastBlock.type);
+  console.log(refined);
+  let elementsInWorkspace = getElementsInWorkspace();
+ if (elementsInWorkspace.elements.length === 0){
+    errorMessages.suggestorErrorMessages("noElements");
+    return;
+  }
+  else if(checkRecommendationConditions(lastBlock)){ 
+    if(refined && checkInTriggerInfoWithName(lastBlock.type)){
+      fireFullDataRec(lastBlock, "trigger", elementsInWorkspace.elements, linkType);
+      textareaMessagesManager(lastBlock, linkType, "full");
+    }
+    else if(refined && checkInActionInfoOnlyName(lastBlock.type)){
+      fireFullDataRec(lastBlock, "action", elementsInWorkspace.elements, linkType);
+      textareaMessagesManager(lastBlock, linkType, "full");
+    }
+    else if(checkInTriggerInfoWithName(lastBlock.type)){
+      fireOnlySequenceRec(elementsInWorkspace.elements, "trigger");
+      textareaMessagesManager(lastBlock, linkType, "onlySeq");
+    }
+    else if(checkInActionInfoOnlyName(lastBlock.type)){
+      fireOnlySequenceRec(elementsInWorkspace.elements, "action"); 
+      textareaMessagesManager(lastBlock, linkType, "onlySeq");
+    }
+    else{
+      errorMessages.suggestorErrorMessages("noElements");
+    }
+  }
+}
+
+/**
+ *  
+ * @param {*} lastBlock 
+ * @param {*} blockType 
+ * @param {*} linkType 
+ */
+function textareaMessagesManager(lastBlock, linkType, recType){
+  if(recType === "onlySeq"){
+    if(lastBlock.blockType === "trigger"){
+     errorMessages.afterTriggerMessage(); 
+    }
+    else {
+     errorMessages.afterActionMessage(); 
+    }
+  }
+  else if(recType === "full"){
+    if(linkType === "and" || linkType === "or"){
+      errorMessages.afterTriggerOpMessage();
+    }
+    else if (linkType === "not"){
+       errorMessages.afterNotMessage();
+    }
+    else if(linkType === "sequential" || linkType === "parallel"){
+      errorMessages.afterActionOpMessage();
+    }
+    else if(linkType === "rule"){
+      errorMessages.startActionEditing();
+    }
+  }
+}
+
+
+/**
+ * Fire first a sequence recommendation, a NN based rec, then joins the two 
+ * using a voting ensemble. 
+ * @param {*} lastBlock 
+ * @param {*} blockType 
+ */
+async function fireFullDataRec(lastBlock, blockType, sequence, linkType){
+  let lastBlockObj;
+  console.log("//////////////////////////////////////")
+  console.log("FIRING A FULL RECOMMENDATION")
+  if(blockType === "trigger"){
+    lastBlockObj = DB.createTriggerFromSingleBlock(lastBlock);
+  }
+  else if (blockType === "action"){
+    lastBlockObj = DB.createActionFromSingleBlock(lastBlock);
+  }
+  else {
+    console.log("WRONG RULE TYPE! rule suggestion not fired")
+    return false;
+  }
+  let lastBlockElementAtt  = BlockSuggestor.generateElementAttFromRuleElement(lastBlockObj, blockType); 
+  //call CPT!
+  let CPTpredictions = obtainSequenceRec(sequence, 2, 10);
+  //call NN!
+//Featurs: el_name, el_type, act_type, trigg_type, link_type, negation
+  let NNpredictions = await neuralNetwork.classify(lastBlockElementAtt.elementName, lastBlockElementAtt.elementType, lastBlockElementAtt.actionType, 
+    lastBlockElementAtt.triggerType, lastBlockElementAtt.nextOp, lastBlockElementAtt.negation).then();
+  //neuralNetwork.classify("bathroom-lightLevel", "trigger", "none", "event", "rule", "none"); 
+  //neuralNetwork.classify("bathroom-lightLevel", "trigger", "none", "event" ,"rule", "negation with time");
+  let CPTpredictionsCheck = [];
+  if(CPTpredictions[0] && CPTpredictions[0].length > 0) { //horrible error handling
+    CPTpredictionsCheck = CPTpredictions[0];
+  }
+  let ensembledResults = voteEnsembler(CPTpredictionsCheck, NNpredictions);
+  // n of predictions, incompatibleCheck and minConfidence should be controlled via the user interface 
+  let predictionToObtain = 5;
+  let minimumConfidence = 0.2;
+  let filterIncompatibleCheck = true;
+  let top5ensembledResults = obtainTopRec(ensembledResults, predictionToObtain);
+  console.log("NN PREDICTIONS:");
+  console.log(NNpredictions);
+  console.log("RESUTLS AFTER ENSEMBLE!!");
+  console.log(ensembledResults);
+  clearSuggestionWorkspace();
+  let minimumConfidenceFiltered = minimumConfidenceFilter(top5ensembledResults, minimumConfidence);
+  let filteredIncompatible = filterIncompatible(minimumConfidenceFiltered, filterIncompatibleCheck, linkType);
+  let filteredRepeated = filterRepeated(filteredIncompatible, sequence);
+  checkIfRuleEnd(filteredRepeated);
+  //let xmlBlocks = DomModifiers.createBlocksFromSuggested(onlySequenceElements); //???
+  let onlySequenceElements = mapToOnlyNameObj(filteredRepeated);
+  DomModifiers.blocksToSuggestionWorkspace(onlySequenceElements); 
+}
+
+/**
+ * Send a message to the textarea if the rules usually ends after the inserted 
+ * rule element 
+ * @param {*} list 
+ */
+function checkIfRuleEnd(list){
+  for(let i = 0; i<list.length; i++) {
+    if(list[0].label === "none"){
+      errorMessages.oftenRuleEnds();
+      break;
+    }
+  }
+  return;
+}
+
+/**
+ * Remove from suggestions rule objs already in the current sequence
+ * @param {*} list 
+ * @param {*} previousInsertedSequence 
+ */
+function filterRepeated(list, previousInsertedSequence){
+  let filtered = list.filter((e) => {
+    return previousInsertedSequence.includes(e.label) ? false : true;
+  });
+  return filtered;
+}
+
+
+/**
+ * Use linktype value to prevent strange behaviours
+ * @param {*} list 
+ * @param {*} check 
+ */
+function filterIncompatible(list, check, linkType){
+  if(!check){
+    return list;
+  }
+  if(linkType === "rule"){
+    let filtered = list.filter((e) => {
+      return checkInActionInfoOnlyName(e.label);
+    });
+    return filtered;
+  }
+  return list;
+}
+
+/**
+ * Use a minimum confindence value to prevent strange behaviours
+ * @param {*} list 
+ * @param {*} minConf 
+ */
+function minimumConfidenceFilter(list, minConf){
+  let copy = list.filter((e) => {
+    return e.value > minConf;
+  });
+  console.log(copy);
+  return copy;
+}
+
+/**
+ * nomen omen 
+ * @param {*} resultObj 
+ * @param {*} nOfRec 
+ */
+function obtainTopRec(resultObj, nOfRec){
+  console.log(resultObj);
+  resultObj.sort((a, b) => {
+      return b.value - a.value;
+  });
+  let sliced = resultObj.slice(0, nOfRec);
+  return sliced;
+}
+
+/**
+ * Mixes the CPT and NN predictors results using the passed weight scores
+ * @param {*} CPTpredictions 
+ * @param {*} NNpredictions 
+ * @param {*} CPTweight 
+ * @param {*} NNweight 
+ */
+function voteEnsembler(CPTpredictions, NNpredictions, CPTweight = 0.5, NNweight = 1){
+ let results = []; 
+  for (let el in NNpredictions){
+    let singleResult = {
+      label: NNpredictions[el].label,
+      value: NNpredictions[el].confidence * NNweight
+    }
+    let onlyLabels = CPTpredictions.map(entry => entry[0]); 
+    let index = onlyLabels.indexOf(NNpredictions[el].label);
+    if(index !== -1){
+      singleResult.value += CPTpredictions[index][1] * CPTweight;
+    }
+    results.push(singleResult);
+  }
+  return results;
+}
+
+/**
+ * Generate a suggestion with CPT using the last inserted block 
+ * @param {*} blockSequence 
+ */
+function fireOnlySequenceRec(blockSequence, blockType){
+  console.log("//////////////////////////////////////")
+  console.log("FIRING A SEQUENCE RECOMMENDATION")
+  let predictions = obtainSequenceRec(blockSequence, 2, 5);
+  if(predictions[0] && predictions[0].length > 0) {
+    console.log("SEQUENCE PREDICTIONS:");
+    console.log(predictions);
+    clearSuggestionWorkspace();
+    let onlySequenceElements = mapToOnlyNameArr(predictions[0]);
+    //let xmlBlocks = DomModifiers.createBlocksFromSuggested(onlySequenceElements); //??
+    DomModifiers.blocksToSuggestionWorkspace(onlySequenceElements);
+  }
+}
+
+
+function obtainSequenceRec(blockSequence, lastNElementsToUse, predictionsNumber){
+  let target = [
+    blockSequence
+  ];
+  let predictions = CPTmodel.predict(
+    target, // Test input
+    lastNElementsToUse, // The number of last elements that will be used
+       // to find similar sequences, (default: target.length)
+    predictionsNumber  // The number of predictions required.
+  );
+  return predictions
+}
+
+/**
+ * 
+ * @param {*} predictionsArr 
+ */
+function mapToOnlyNameArr(predictionsArr){
+    return predictionsArr.map(entry => entry[0]); 
+}
+
+/**
+ * 
+ * @param {*} predictionsArr 
+ */
+function mapToOnlyNameObj(predictionsArr){
+    return predictionsArr.map(entry => entry.label); 
+}
 
 /**
  * Ottiene il primo trigger nel blocco regola, estrae dal DB le altre regole che 
@@ -1397,7 +1724,7 @@ async function suggestorRule() {
   //let firstTrigger = getFirstTrigger();
   let firstTrigger = getLastTrigger();
   if (!firstTrigger) {
-    suggestorErrorMessages("noFirstTrigger");
+    errorMessages.suggestorErrorMessages("noFirstTrigger");
     return;
   }
   // Non prendere solo regole con first trigger, ma che contengano questo trigger
@@ -1413,7 +1740,7 @@ async function suggestorRule() {
     console.log(rulesWithFirstTrigger);
 
     if (!rulesWithFirstTrigger || rulesWithFirstTrigger.length === 0) {
-      suggestorErrorMessages("noRulesWithTrigger");
+      errorMessages.suggestorErrorMessages("noRulesWithTrigger");
       return;
     }
 
@@ -1425,7 +1752,7 @@ async function suggestorRule() {
   console.log(rulesWithFirstTrigger);
   const suggestionListObj = await BlockSuggestor.generateSuggestions(rulesWithFirstTrigger, firstTrigger).then();
   if (!suggestionListObj || suggestionListObj.resultPathList.length === 0) {
-    suggestorErrorMessages("noSuggestion");
+    errorMessages.suggestorErrorMessages("noSuggestion");
     return;
   }
 
@@ -1477,7 +1804,7 @@ function extractTriggersFromSuggestionList(listObj) {
 async function suggestorCategory() {
   const firstTrigger = getFirstTrigger();
   if (!firstTrigger) {
-    suggestorErrorMessages("noFirstTrigger");
+    errorMessages.suggestorErrorMessages("noFirstTrigger");
     return;
   }
 
@@ -1489,12 +1816,12 @@ async function suggestorCategory() {
   console.log("rules with trigger category: ");
   console.log(rulesWithFirstTriggerCategory);
   if (!rulesWithFirstTriggerCategory || rulesWithFirstTriggerCategory.length === 0) {
-    suggestorErrorMessages("noRulesWithTrigger");
+    errorMessages.suggestorErrorMessages("noRulesWithTrigger");
     return;
   }
   const suggestionListObj = await BlockSuggestor.generateSuggestions(rulesWithFirstTriggerCategory, triggerWithMyCategory).then();
   if (!suggestionListObj || suggestionListObj.resultPathList.length === 0) {
-    suggestorErrorMessages("noSuggestion");
+    errorMessages.suggestorErrorMessages("noSuggestion");
     return;
   }
   createBlocksFromSuggested(suggestionListObj.resultPathList);
@@ -1531,7 +1858,7 @@ async function suggestorAction() {
         DomModifiers.actionsToSuggestionWorkspace(bestSuggestion);
       }
       else {
-        suggestorErrorMessages("noActionSuggestion");
+        errorMessages.suggestorErrorMessages("noActionSuggestion");
         return;
       }
     }
@@ -1541,6 +1868,7 @@ const exportSuggestorAction = suggestorAction;
 export { exportSuggestorAction };
 
 /**
+ * UNUSED
  * Estrae i blocchi dal workspace dei suggerimenti e li inserisce in quello
  * principale
  */
@@ -1568,7 +1896,7 @@ export { exportSuggestorDrop };
 
 
 /**
- * Non usata
+ * UNUSED
  * Controlla la posizione di un blocco all'interno del flusso di blocchi nel
  * workspace, la restituisce come indice. 
  * @param {*} id 
@@ -1661,7 +1989,6 @@ export function getTriggerInfo() {
  */
 export function getActionInfo() {
   "use strict";
-  console.log(actionCompleteInfo);
   return actionCompleteInfo;
 }
 
@@ -1767,52 +2094,6 @@ export function setActionList(newActionList) {
   actionList = newActionList;
 }
 
-
-/**
- * Non usata
- * Extension chiamata quando c'è almeno una condition, abilita il blocco 
- * "until... then"
- * @param {*} workspace 
- */
-export function enable_after(workspace) {
-  let toolBox = toolboxTree;
-  const parser = new DOMParser();
-  const srcDOM = parser.parseFromString(toolBox, "application/xml"); //da stringa a DOM document
-  let blocks = srcDOM.getElementsByTagName("block");
-  for (let item of blocks) {
-    if (item.getAttribute("type") === "rule_revert") {
-      item.setAttribute("disabled", false)
-    }
-  }
-  let toXml = new XMLSerializer().serializeToString(srcDOM); //da DOM document a xml
-  workspace.updateToolbox(toXml);
-  workspace.toolbox_.refreshSelection();
-
-
-}
-
-/**
- * Non usata
- * Extension chiamata quando non ci sono più conditions
- * @param {*} workspace 
- */
-export function disable_after(workspace) {
-  let toolBox = toolboxTree;
-  const parser = new DOMParser();
-  const srcDOM = parser.parseFromString(toolBox, "application/xml"); //da stringa a DOM document
-  let blocks = srcDOM.getElementsByTagName("block");
-  for (let item of blocks) {
-    if (item.getAttribute("type") === "rule_revert") {
-      item.setAttribute("disabled", true)
-    }
-  }
-  let toXml = new XMLSerializer().serializeToString(srcDOM); //da DOM document a xml
-  //naive check if the format is xml
-  if (toXml && toXml.charAt(1) === "x") {
-    workspace.updateToolbox(toXml);
-    workspace.toolbox_.refreshSelection();
-  }
-}
 
 
 /**
@@ -2432,7 +2713,7 @@ function getActionOps(){
  * Controlla se il trigger passato è presente nel db dei trigger
  * @param {*} trigger 
  */
- function checkInTriggerInfoWithName(trigger) {
+ export function checkInTriggerInfoWithName(trigger) {
   const triggerInfo = getTriggerInfo();
   let found = false;
   triggerInfo.forEach(function (e) {
@@ -2447,7 +2728,7 @@ function getActionOps(){
  * Controlla se il trigger operator passato è presente nel db degli op
  * @param {*} trigger 
  */
-function checkInTriggerOperators(triggerOp) {
+export function checkInTriggerOperators(triggerOp) {
   const triggerOps = getTriggerOps();
   let found = false;
   triggerOps.forEach(function (e) {
@@ -2462,7 +2743,7 @@ function checkInTriggerOperators(triggerOp) {
  * Controlla se il trigger operator passato è presente nel db degli op
  * @param {*} trigger 
  */
-function checkInActionOperators(actionOp) {
+export function checkInActionOperators(actionOp) {
   const actionOps = getActionOps();
   let found = false;
   actionOps.forEach(function (e) {
@@ -2482,6 +2763,21 @@ function checkInActionInfo(action) {
   let found = false;
   actionInfo.forEach(function (e) {
     if (e.fullName === action.type) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+/**
+ * check if the passed action name can be found in actions db 
+ * @param {*} action
+ */
+export function checkInActionInfoOnlyName(action) {
+  const actionInfo = getActionInfo();
+  let found = false;
+  actionInfo.forEach(function (e) {
+    if (e.fullName === action) {
       found = true;
     }
   });
@@ -2708,15 +3004,15 @@ export function getUserName() {
 /**
  * Helper function
  */
-export function setLastTrigger(block){
-  lastTrigger = block;
+export function setLastBlock(block){
+  lastBlock = block;
 }
 
 /**
  * Helper function
  */
-export function getLastTrigger(){
-  return lastTrigger;
+export function getLastBlock(){
+  return lastBlock;
 }
 
 /**
@@ -2755,3 +3051,24 @@ export function clearSuggestionWorkspace(){
   let allSuggestedBlocks = secondWorkspace.getAllBlocks(false);
   allSuggestedBlocks.forEach( e => e.dispose());
 }
+
+export function blockToDom(xml){
+  return(Blockly.Xml.blockToDom(xml));
+}
+
+
+function convertElementAttInArr(allElementAtt){
+  let arrayed = [];
+  allElementAtt.forEach(el => {
+    let row = [];
+    row.push(el.element_name);
+    row.push(el.element_type);
+    row.push(el.action_type);
+    row.push(el.trigger_type);
+    row.push(el.link_type);
+    row.push(el.negation);
+    row.push(el.next_element);
+    arrayed.push(row);
+  })
+  return arrayed;
+};

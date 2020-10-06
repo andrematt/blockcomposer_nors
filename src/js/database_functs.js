@@ -1,12 +1,12 @@
 import { getUserName, getWorkspace, getTriggerInfo, getHighlightedRule, 
          createRuleBlocksObj, createRuleBlocksStr, getTriggerWithMyCategory,
-         getActionInfo 
+         getActionInfo, getElementsInWorkspace, getTriggerWithNoNextConnection 
         } from "./main.js";
-import {generateGraphFromRule} from "./blockSuggestor.js";
+import {generateElementAttributeTable} from "./block_suggestor.js";
 import {getLoggedUser} from "./login.js";
-import {printPassedError} from "./compositionErrorMessages.js";
+import {printPassedError} from "./textarea_manager.js";
 import {createUpdateAction, getFirstNextOperator, haveSameOperator, 
-        sendRuleDeactivationToNode, getRuleActivationStatus} from "./sendToNodeFunctions.js";
+        sendRuleDeactivationToNode, getRuleActivationStatus} from "./send_to_node.js";
  
 import GLOBALS from "./ctx_sources.js";
 let lastDepth = 0;
@@ -35,91 +35,6 @@ export async function deactivateRule(){
 // TODO controlla id di regole
 
 
-/**
- * 
- * @param {*} matrix 
- */
-export async function updateMatrixDB(id, matrix){
-  "use strict";
-  console.log("UPDATEmatrixDB", id, matrix);
-  let timestamp = Date.now();
-  let timestamp_str = "" + timestamp;
-  let matrix_str = matrix.toString();
-  //console.log(matrix_str);  
-  let matrix_json = JSON.stringify(matrix);
-  console.log(matrix_json);
-  jQuery.ajax({
-      type: "POST",
-      url: GLOBALS.db_access_url,
-      dataType: 'json',
-      data: { functionname: 'updateMatrix', arguments: [id, matrix_json, timestamp_str] },
-      success: function (obj, textstatus) {
-        if (!('error' in obj)) {
-          //let result = obj.result;
-          console.log("update ok");
-          //myWorkspace.clear();
-          //TODO modal save ok
-        }
-        else {
-          console.log(obj.error);
-        }
-      }
-    }); 
-  return;
-}
-
-
-/**
- * 
- * @param {*} matrix 
- */
-export async function saveMatrixDB(matrix){
-  "use strict";
-  let timestamp = Date.now();
-  let timestamp_str = "" + timestamp;
-  let matrix_str = matrix.toString();
-  //console.log(matrix_str);  
-  let matrix_json = JSON.stringify(matrix);
-  console.log(matrix_json);
-  jQuery.ajax({
-      type: "POST", 
-      url: GLOBALS.db_access_url,
-      dataType: 'json',
-      data: { functionname: 'saveMatrix', arguments: [matrix_json, timestamp_str] },
-
-      success: function (obj, textstatus) {
-        if (!('error' in obj)) {
-          //let result = obj.result;
-          console.log("save ok");
-        }
-        else {
-          console.log(obj.error);
-        }
-      }
-    }); 
-  return;
-}
-
-
-/**
- * 
- */
-export async function retreiveMatrixDB(){
-  "use strict";
-  let result;
-  try {
-    result = await $.ajax({
-      type: "POST",
-      url: GLOBALS.db_access_url,
-      dataType: 'json',
-      data: { functionname: 'getMatrix', arguments: ["test"] },
-    });
-    console.log(result);
-    return result.result;
-  } catch (error) {
-    console.error(error);
-  }
-}
 
 /**
  * 
@@ -131,12 +46,12 @@ export async function deleteRule(){
     console.log("deleting ", ruleToDelete);
     const id = ruleToDelete[0].id;
     console.log(id);
-   let deleteResult = await deleteGraph(id).then();
-   deleteBlocks(id);
+   let deleteResult = await deleteSequence(id).then();
+   deleteRuleObj(id);
   }
 }
 
-async function deleteGraph(id){
+async function deleteSequence(id){
   "use strict";
   let result;
   try {
@@ -144,9 +59,9 @@ async function deleteGraph(id){
       type: "POST",
       url: GLOBALS.db_access_url,
       dataType: 'json',
-      data: { functionname: 'deleteGraph', arguments: [id] },
+      data: { functionname: 'deleteSequence', arguments: [id] },
     });
-    console.log("delete graph");
+    console.log("delete sequence");
     return result.result;
   } catch (error) {
     console.error(error);
@@ -158,7 +73,7 @@ async function deleteGraph(id){
  * 
  * @param {*} id 
  */
-async function deleteBlocks(id){
+async function deleteRuleObj(id){
   "use strict";
   let result;
   try {
@@ -166,9 +81,9 @@ async function deleteBlocks(id){
       type: "POST",
       url: GLOBALS.db_access_url,
       dataType: 'json',
-      data: { functionname: 'delete', arguments: [id] },
+      data: { functionname: 'deleteRule', arguments: [id] },
     });
-    console.log("delete blocks");
+    console.log("delete rule Obj");
     return result.result;
   } catch (error) {
     console.error(error);
@@ -185,69 +100,45 @@ export async function saveRuleInDB() {
   let blocksInRuleStr = createRuleBlocksStr(blocksInRule);
   let ruleTriggersStr = blocksInRuleStr.triggers.join();
   let ruleActionsStr = blocksInRuleStr.actions.join();
-  let ruleTriggersOpStr = blocksInRuleStr.triggers_ops? blocksInRuleStr.triggers_ops.join() : "";
-  let ruleActionsOpStr = blocksInRuleStr.actions_ops? blocksInRuleStr.actions_ops.join() : "";
   let ruleTriggersRealNameStr = blocksInRuleStr.triggersRealName.join();
   let ruleActionsRealNameStr = blocksInRuleStr.actionsRealName.join();
   const id  = create_UUID();
-  console.log(ruleTriggersStr);
-  console.log(ruleActionsStr);
-  //il secondo param è no_id: gli id dei blocchi non dovrebbero servire
-  let rule_xml = Blockly.Xml.workspaceToDom(myWorkspace, false);
+  let rule_xml = Blockly.Xml.workspaceToDom(myWorkspace, false); //il secondo param è no_id: gli id dei blocchi non dovrebbero servire
   let pretty_dom_xml = Blockly.Xml.domToPrettyText(rule_xml);
-  console.log(pretty_dom_xml);
-  //non viene salvato il graph, manda array 
   let blocksDb = myWorkspace.blockDB_;
   let rule_obj = makeRuleObj(blocksDb, false, id);
   let rule_obj_str = JSON.stringify(rule_obj);
-  //let rule_xml_str = new XMLSerializer().serializeToString(rule_xml); 
-  //let rule_graph = generateMatrixFromRule(myWorkspace); decommenta queste per usare il vecchio RS
-  let rule_graph = generateGraphFromRule(rule_obj);
-  console.log(rule_graph);
-  let rule_graph_str = JSON.stringify(rule_graph);
-  console.log(rule_graph_str);
-  if(typeof rule_graph === "undefined"){
-    console.log("non ci sono trigger, non salvo");
-    return;
-  }
-  let first_trigger = rule_graph[0].source;
-  console.log(first_trigger);
-  //let user_name = getLoggedUser();  //document.getElementById('user_name').value;
-  //let user_name = document.getElementById('user_name').value;
+  let rule_sequence = getElementsInWorkspace(); 
+  let rule_sequence_str = JSON.stringify(rule_sequence.elements);
+  let rule_elementAttributeTable = generateElementAttributeTable(id, rule_obj);
+  //let rule_elementAttributeTable_str = JSON.stringify(rule_elementAttributeTable);
+  let first_trigger = rule_sequence[0];
   let user_name =  getUserName();//window.localStorage.getItem('user');
   let rule_name = document.getElementById('rule_name').value;
   let timestamp = Date.now();
   let timestamp_str = "" + timestamp;
-  console.log(timestamp);
-  console.log(rule_name);
-  // console.log(user_name);
-  if (user_name && rule_graph_str && rule_obj_str) {
-let saveResult = await saveGraph(id, user_name, rule_graph_str, first_trigger, ruleTriggersRealNameStr, ruleActionsRealNameStr, timestamp_str).then();
+  if (user_name && rule_sequence && rule_obj && rule_elementAttributeTable) {
+//let saveResult = await saveGraph(id, user_name, rule_graph_str, first_trigger, ruleTriggersRealNameStr, ruleActionsRealNameStr, timestamp_str).then();
+//saveGraphNew(rule_id, user_name, rule_name, timestamp_str, ruleGraphArr).then();
+await saveSequence(id, rule_sequence_str).then();
+await saveElementAttribute(rule_elementAttributeTable).then();
 saveBlocks(id, user_name, rule_name, rule_obj_str, pretty_dom_xml, first_trigger, timestamp_str, ruleTriggersStr, ruleActionsStr);
 }
  
 }
 
-
-/**
- * Funzione asincrona per salvare il grafo della regola nel workspace
- * @param {*} id 
- * @param {*} user_name 
- * @param {*} rule_graph_str 
- * @param {*} first_trigger 
- * @param {*} timestamp_str 
- */
-async function saveGraph(id, user_name, rule_graph_str, first_trigger, trigger_str, ruleTriggersOpStr, action_str, ruleActionsOpStr, timestamp_str){
+async function saveElementAttribute(elementAttTable){
   "use strict";
+  console.log(elementAttTable);
   let result;
   try {
     result = await $.ajax({
       type: "POST",
       url: GLOBALS.db_access_url,
       dataType: 'json',
-      data: { functionname: 'saveSingleGraph', arguments: [id, user_name, rule_graph_str, first_trigger, trigger_str, ruleTriggersOpStr, action_str, ruleActionsOpStr, timestamp_str] },
+      data: { functionname: 'saveElementAtt', arguments: [elementAttTable] },
     });
-    console.log("save graph");
+    console.log("Saving element/att list");
     return result.result;
   } catch (error) {
     console.error(error);
@@ -255,7 +146,32 @@ async function saveGraph(id, user_name, rule_graph_str, first_trigger, trigger_s
 }
 
 /**
- * Funzione asincrona per salvare la regola nel workspace
+ * Funzione asincrona per salvare la sequenza della regola 
+ * @param {*} id 
+ * @param {*} user_name 
+ * @param {*} rule_graph_str 
+ * @param {*} first_trigger 
+ * @param {*} timestamp_str 
+ */
+async function saveSequence(id, rule_sequence_str){
+  "use strict";
+  let result;
+  try {
+    result = await $.ajax({
+      type: "POST",
+      url: GLOBALS.db_access_url,
+      dataType: 'json',
+      data: { functionname: 'saveSingleSequence', arguments: [id, rule_sequence_str] },
+    });
+    console.log("Saving sequence");
+    return result.result;
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+/**
+ * Funzione asincrona per salvare i blocchi della regola 
  * @param {*} id 
  * @param {*} user_name 
  * @param {*} rule_name 
@@ -372,7 +288,7 @@ export async function getAllFromDB() {
 /**
  * Get di tutte le regole dal db usando async/await
  */
-export async function getAllGraphsFromDB() {
+export async function getAllSequencesFromDB() {
   "use strict";
   let result;
   //let user = getLoggedUser();
@@ -383,7 +299,7 @@ export async function getAllGraphsFromDB() {
       type: "POST",
       url: GLOBALS.db_access_url,
       dataType: 'json',
-      data: { functionname: 'getAllGraphs', arguments: [user] },
+      data: { functionname: 'getAllSequences', arguments: [user] },
     });
     return result.result;
   } catch (error) {
@@ -392,6 +308,29 @@ export async function getAllGraphsFromDB() {
   }
 }
 
+
+/**
+ * Get di tutte le regole dal db usando async/await
+ */
+export async function getAllElementAttFromDB() {
+  "use strict";
+  let result;
+  //let user = getLoggedUser();
+  let user = "allUsers";
+  if(user){
+  try {
+    result = await $.ajax({
+      type: "POST",
+      url: GLOBALS.db_access_url,
+      dataType: 'json',
+      data: { functionname: 'getAllElementAtt', arguments: [user] },
+    });
+    return result.result;
+  } catch (error) {
+    console.error(error);
+  }
+  }
+}
 
 
 /**
@@ -441,15 +380,117 @@ export async function getOneFromDB(id) {
 }
 
 /**
+ * Just runs on the action sequence, and not on the actual action blocks. 
+ * May fails if an action is repeated.  
+ * @param {*} actualBlock 
+ */
+export function getNextBlockAction(actualBlock){
+  let elementsInWorkspace = getElementsInWorkspace();
+  let index = elementsInWorkspace.elements.indexOf(actualBlock.type); //TYPE???
+  if(index === -1){
+    console.log("error: index not found in block in rule");
+    return false;
+  }
+  else {
+    if(index +1 < elementsInWorkspace.elements.length){
+      return elementsInWorkspace.elements[index+1]
+    }
+    else {
+      return "none"
+    }
+
+  }
+}
+
+/**
+ * Just runs on the trigger sequence, and not on the actual trigger blocks. 
+ * May fails if a trigger is repeated.  
+ * @param {*} actualBlock 
+ */
+export function getNextBlockTrigger(actualBlock){
+  let elementsInWorkspace = getElementsInWorkspace();
+  let index = elementsInWorkspace.elements.indexOf(actualBlock.type);
+  if(index === -1){
+    console.log("error: index not found in block in rule");
+    return false;
+  }
+  else {
+    if(index +1 < elementsInWorkspace.elements.length){
+      return elementsInWorkspace.elements[index+1]
+    }
+    else {
+      return "none"
+    }
+
+  }
+}
+
+
+/**
+ * Get next operator considering the use of the simple "parallel" block 
+ * @param {*} actualBlock 
+ */
+function getNextOperatorAction(actualBlock){
+  let nextBlock = actualBlock.getNextBlock();
+  if (nextBlock){
+    //return nextBlock.type === "parallel" ? 
+     // {type: "parallel", attribute: "none"} :
+     // {type: "sequential", attribute: "none"};
+    return nextBlock.type === "parallel" ? "parallel" : "sequential";
+  } 
+  //rule end
+  return "none";
+//  return {type: "none", operator: "none"};
+}
+
+
+
+/**
+ * Get next operator considering the use of the block "parallel dynamic" 
+ * @param {*} actualBlock 
+ */
+function getNextOperatorActionParallelDynamic(actualBlock){
+  let nextBlock = actualBlock.getNextBlock();
+  if (nextBlock){
+    return nextBlock.type === "parallel_dynamic" ? 
+      {type: "sequential", attribute: "start parallel"} :
+      {type: "sequential", attribute: "none"};
+  }
+  let previousBlock = actualBlock.getPreviousBlock();
+  if(previousBlock && previousBlock.type !== "rule"){
+    let previousParent = previousBlock.parentBlock_; 
+    let myId = actualBlock.id;
+    let lastActionPlaceholderBlock;
+    for(let i = 0; i< previousParent.childBlocks_.length; i++){
+      if(previousParent.childBlocks_[i].blockType === "action_placeholder")
+      lastActionPlaceholderBlock = previousParent.childBlocks_[i]; 
+    }
+    if(lastActionPlaceholderBlock) {
+      let idToCheck =  lastActionPlaceholderBlock.childBlocks_[0].id;
+      return myId === idToCheck ? 
+        {type: "sequential", attribute: "end parallel"} :
+        {type: "parallel", attribute: "none"}; 
+      }
+    else {
+      return {type: "sequential", attribute: "none"};
+    }
+  }
+  //rule end
+  return {type: "none", operator: "none"};
+}
+
+
+
+/**
  * 
  * @param {*} actualBlock 
  */
-function getNextOperator(actualBlock){
+function getNextOperatorTrigger(actualBlock){
   let nextBlock = actualBlock.getNextBlock();
   if (nextBlock && (nextBlock.type === "and" || nextBlock.type === "or")) {
     return nextBlock.type;
   }
-  return "and";
+  return "rule";
 }
 
 /**
@@ -528,6 +569,7 @@ function getTriggerNotValue(actualBlock){
           let checkDay = false;
           let checkStartTime = false;
           let checkEndTime = false;
+          if(dayField) {
           dayField.fieldRow.forEach(function(e){
             console.log(e.name);
             console.log(e.state);
@@ -540,9 +582,10 @@ function getTriggerNotValue(actualBlock){
               }
             }
           });
-
+          }
           let startTimeHour;
           let startTimeMin;
+          if(startTimeField) {
           startTimeField.fieldRow.forEach(function(e){
             if(e.name==="start_time_check" && e.state_ === true){
               checkStartTime = true;
@@ -557,9 +600,10 @@ function getTriggerNotValue(actualBlock){
               }
           });
           startTime = startTimeHour + ":" + startTimeMin;
-
+          }
           let endTimeHour;
           let endTimeMin;
+          if(endTimeField) {
           endTimeField.fieldRow.forEach(function(e){
             if(e.name==="end_time_check" && e.state_ === true){
               checkEndTime = true;
@@ -575,6 +619,7 @@ function getTriggerNotValue(actualBlock){
             }
           });
           endTime = endTimeHour + ":" + endTimeMin;
+        }
         values.push(day, startTime, endTime);
         return values;
       }
@@ -611,14 +656,16 @@ function createTriggerArr(_rule) {
     if (_rule.blocks[block].isTrigger) {
       let trigger = {};
       //  console.log(_rule.blocks[block]);
-      trigger.triggerType = _rule.blocks[block].childBlocks_[0].type; // TODO controlla che vada sempre bene
+      trigger.triggerType = _rule.blocks[block].childBlocks_[0].type; 
+      trigger.type = _rule.blocks[block].type; 
       trigger.blockId = _rule.blocks[block].id;
       trigger.dimension = _rule.blocks[block].dimension;
       trigger.dimensionId = _rule.blocks[block].dimensionId;
-      trigger.nextOperator = getNextOperator(_rule.blocks[block]);      
+      trigger.nextOperator = getNextOperatorTrigger(_rule.blocks[block]);      
       trigger.operator = getActualOperator(_rule.blocks[block]);
       trigger.parent = _rule.blocks[block].getFieldValue("parent_name");
       trigger.value = getTriggerValue(_rule.blocks[block]);
+      trigger.nextElement = getNextBlockTrigger(_rule.blocks[block]);
       //gruppi: da creare quando è definito l'array di trigger
       trigger.startGroup = "";
       trigger.closeGroup = "";
@@ -650,14 +697,17 @@ function createActionArr(_rule) {
       let parentAction;
       let action = {};
       action.action = {};
-      action.action.realName = _rule.blocks[block].getFieldValue("real_name");
+      //action.action.realName = _rule.blocks[block].getFieldValue("real_name");
+      action.action.realName = _rule.blocks[block].type;
       action.type = _rule.blocks[block].getFieldValue("type");
       action.action.type = _rule.blocks[block].getFieldValue("type");
       action.parent = _rule.blocks[block].getFieldValue("parent_name");
+      action.timing = _rule.blocks[block].timing;
+      action.nextElement = getNextBlockAction(_rule.blocks[block]);
       // di default prende come operator e value i valori della select e
       // dell'input, eventualmente dopo vengono aggiornati.
-      action.operator = _rule.blocks[block].getFieldValue("SELECT_FIELD_VALUE");
-
+      //action.operator = _rule.blocks[block].getFieldValue("SELECT_FIELD_VALUE");
+      action.operator = getNextOperatorAction(_rule.blocks[block]);
       if (!_rule.blocks[block].isActionArray) {
         action.value = _rule.blocks[block].getFieldValue("INPUT_FIELD_VALUE");
 
@@ -676,52 +726,6 @@ function createActionArr(_rule) {
           action.duration =_rule.blocks[block].getFieldValue("SELECT_FIELD_VALUE");
         }
 
-        /*
-          else if (_rule.blocks[block].type === 'update' || _rule.blocks[block].type === 'create' || _rule.blocks[block].type === 'delete') {
-            action.values = new Array(); 
-            for (var i = 0; i < _rule.blocks[block].action.params.length; i++) {
-              var val = '';
-              if (GLOBALS.tmpAction.action.params[i].type === 'string') {
-                val = $("#action_text_" + GLOBALS.tmpAction.action.params[i].realName).val()
-              } else if (GLOBALS.tmpAction.action.params[i].type === 'choice') {
-                if (GLOBALS.tmpAction.action.params[i].possibleValues.length > 5) {
-                  //select
-                  val = $("#action_select_" + GLOBALS.tmpAction.action.params[i].realName).val();
-                } else {
-                  //radio button
-                  val = $("#" + GLOBALS.tmpAction.action.params[i].realName + "Group > button.btn-success").attr("value");
-                }
-              }
-              GLOBALS.tmpAction.values.push({ realName: GLOBALS.tmpAction.action.params[i].realName, value: val });
-            }
-            console.log(GLOBALS.tmpAction.type);
-            //Switch per prendere i valori a seconda del tipo di azione    
-          } else if (GLOBALS.tmpAction.type === 'invokeFunctions:changeApplianceState') {
-            if (GLOBALS.tmpAction.operator === "turnOn") {
-              GLOBALS.tmpAction.value = "ON";
-            }
-            else {
-              GLOBALS.tmpAction.value = "OFF";
-            }
-          } else if (GLOBALS.tmpAction.type === 'invokeFunctions:lightScene') {
-            GLOBALS.tmpAction.value = GLOBALS.tmpAction.action.realName;
-          } else if (GLOBALS.tmpAction.type === 'update:lightColor') {
-            GLOBALS.tmpAction.value = $("#color").val();
-            GLOBALS.tmpAction.duration = $("#actionDuration").val();
-          } else if (GLOBALS.tmpAction.type === 'custom:font_color' || GLOBALS.tmpAction.type === 'custom:background_color') {
-            GLOBALS.tmpAction.value = $("#color").val();
-          } else if (GLOBALS.tmpAction.type === 'custom:distributionDuplicate' ||
-            GLOBALS.tmpAction.type === 'custom:distributionPartial') {
-            GLOBALS.tmpAction.value = $("#distributionTarget").val();
-          } else if (GLOBALS.tmpAction.type === 'function') {
-            GLOBALS.tmpAction.realName = GLOBALS.tmpAction.action.realName;
-          } else {
-            GLOBALS.tmpAction.value = $("#inputActionValue").val();
-          }
-  
-          GLOBALS.tmpAction.parent = parent;
-  
-          */
       }
       //azioni di tipo composto, hanno il campo values
       else {
@@ -870,6 +874,7 @@ function prepareTmpTrigger(_rule, j) {
   _tmpTrigger.dimension = _rule.triggers[j].dimension;
   _tmpTrigger.dimensionId = _rule.triggers[j].dimensionId;
   _tmpTrigger.nextOperator = _rule.triggers[j].nextOperator;
+  _tmpTrigger.nextElement = _rule.triggers[j].nextElement;
   _tmpTrigger.operator = _rule.triggers[j].operator;
   _tmpTrigger.parent = _rule.triggers[j].parent;
   _tmpTrigger.type = _rule.triggers[j].type;
@@ -997,7 +1002,6 @@ function getActionMode(_rule) {
       // altri blocchi 
       if (!nextBlock && previousBlock && previousBlock.type === "rule") {
         ruleType = "parallel";
-        console.log("rule type: ", ruleType);
         return ruleType;
       }
       // se ha come nextBlock o previousBlock un blocco azione o un altro 
@@ -1008,14 +1012,181 @@ function getActionMode(_rule) {
         (previousBlock.isAction || previousBlock.type === "parallel_dynamic" || previousBlock.type === "rule")
       ) {
         ruleType = "mixed";
-        console.log("rule type: ", ruleType);
         return ruleType;
       }
     }
   }
-  console.log("rule type: ", ruleType);
   return ruleType;
 }
+
+/**
+ * Make a rule obj from a single trigger block.
+ * Used by Neural Network suggestor in prediction phase.
+ * @param {*} block 
+ * @param {*} blockType 
+ */
+export function createTriggerFromSingleBlock(block){
+      let trigger = {};
+      //  console.log(_rule.blocks[block]);
+      trigger.triggerType = block.childBlocks_[0].type; // TODO controlla che vada sempre bene
+      trigger.type = block.type;
+      trigger.blockId = block.id;
+      trigger.dimension = block.dimension;
+      trigger.dimensionId = block.dimensionId;
+      trigger.nextOperator = getNextOperatorTrigger(block);      
+      trigger.operator = getActualOperator(block);
+      trigger.parent = block.getFieldValue("parent_name");
+      trigger.value = getTriggerValue(block);
+      //gruppi: da creare quando è definito l'array di trigger
+      trigger.startGroup = "";
+      trigger.closeGroup = "";
+      trigger.notValue = getTriggerNotValue(block);  
+      trigger.isNot = trigger.notValue ? true : false;
+      trigger.element = getTriggerElement(block); 
+    return trigger;
+}
+
+/**
+ * Make a rule obj from a single action block.
+ * Used by Neural Network suggestor in prediction phase.
+ * @param {*} block 
+ */
+export function createActionFromSingleBlock(block){
+  "use strict";
+  let action = {};
+  let parentAction;
+  action.action = {};
+  //action.action.realName = block.getFieldValue("real_name");
+  action.action.realName = block.type;
+  action.type = block.getFieldValue("type");
+  action.action.type = block.getFieldValue("type");
+  action.parent = block.getFieldValue("parent_name");
+  action.timing = block.timing;
+      // di default prende come operator e value i valori della select e
+      // dell'input, eventualmente dopo vengono aggiornati.
+      //action.operator = _rule.blocks[block].getFieldValue("SELECT_FIELD_VALUE");
+  action.operator = getNextOperatorAction(block);
+  if (!block.isActionArray) {
+    action.value = block.getFieldValue("INPUT_FIELD_VALUE");
+
+    // azioni relative alle luci
+    if (action.type === 'invokeFunctions:changeApplianceState') {
+      if (action.operator === "0") {
+            action.value = "ON";
+          }
+          else {
+            action.value = "OFF";
+          }
+        } else if (action.type === 'invokeFunctions:lightScene') {
+          action.value = action.realName;
+        } else if (action.type === 'update:lightColor') {
+          action.value =block.getFieldValue("COLOR_FIELD_VALUE");
+          action.duration =block.getFieldValue("SELECT_FIELD_VALUE");
+        }
+
+      }
+      //azioni di tipo composto, hanno il campo values
+      else {
+        action.values = [];
+        if (block.type === "alarmText" || block.type === "Alarms-alarmText") {
+          block.inputList.forEach(function (element) {
+            console.log(element);
+            if (element.name === "TEXT") {
+              let value = {
+                description: "Alarm Text",
+                displayedName: "Text",
+                realName: "alarmText",
+                type: "custom:string",
+                value: block.getFieldValue("ALARM_TEXT")
+              };
+              action.values.push(value);
+            }
+
+            else if (element.name === "NOTIFICATION") {
+              let value = {
+                description: "Notification mode",
+                displayedName: "Notification mode",
+                realName: "notificationMode",
+                type: "custom:notificationMode",
+                value: block.getFieldValue("NOTIFICATION_MODE")
+              };
+              action.values.push(value);
+            }
+
+            else if (element.name === "TIMES") {
+              let value = {
+                description: "How many times alert should be sent",
+                displayedName: "Repetition",
+                realName: "repetition",
+                type: "custom:repetitionType",
+                value: block.getFieldValue("REPETITIONS")
+              };
+              action.values.push(value);
+            }
+
+            else if (element.name === "SEND") {
+              let value = {
+                description: "Alarm recipient",
+                displayedName: "Recipient",
+                realName: "alarmRecipient",
+                type: "custom:string",
+                value: block.getFieldValue("SEND_TO")
+              };
+              action.values.push(value);
+            }
+          });
+        }
+        else if (block.type === "reminderText" || block.type === "Reminders-reminderText") {
+          block.inputList.forEach(function (element) {
+            console.log(element);
+            if (element.name === "TEXT") {
+              let value = {
+                description: "Reminder Text",
+                displayedName: "Text",
+                realName: "reminderText",
+                type: "custom:string",
+                value: block.getFieldValue("REMINDER_TEXT")
+              };
+              action.values.push(value);
+            }
+
+            else if (element.name === "NOTIFICATION") {
+              let value = {
+                description: "Notification mode",
+                displayedName: "Notification mode",
+                realName: "notificationMode",
+                type: "custom:notificationMode",
+                value: block.getFieldValue("NOTIFICATION_MODE")
+              };
+              action.values.push(value);
+            }
+
+            else if (element.name === "TIMES") {
+              let value = {
+                description: "How many times alert should be sent",
+                displayedName: "Repetition",
+                realName: "repetition",
+                type: "custom:repetitionType",
+                value: block.getFieldValue("REPETITIONS")
+              };
+              action.values.push(value);
+            }
+
+            else if (element.name === "SEND") {
+              let value = {
+                description: "Reminder recipient",
+                displayedName: "Recipient",
+                realName: "reminderRecipient",
+                type: "custom:string",
+                value: block.getFieldValue("SEND_TO")
+              };
+              action.values.push(value);
+            }
+          });
+        }
+      }
+    return action;
+    }
 
 /**\
  * Crea l'oggetto da salvare nel db
@@ -1045,12 +1216,10 @@ function makeRuleObj(blockDb, isUpdate, id) {
   var _tmpRule = prepareTmpRule(_rule);
 
   let triggersWithGroup = setTriggerGroup(_rule.triggers);
-  //console.log(triggersWithGroup);
   _rule.triggers = triggersWithGroup;
 
   for (var j = 0; j < _rule.triggers.length; j++) {
     setTriggerDepth(_rule.triggers[j], j, _rule.triggers);
-    // console.log("depth: ", lastDepth);
     _rule.triggers[j].depth = lastDepth;
     lastDepth = 0;
     var _tmpTrigger = prepareTmpTrigger(_rule, j);
@@ -1058,14 +1227,15 @@ function makeRuleObj(blockDb, isUpdate, id) {
   }
 
   for (var k = 0; k < _rule.actions.length; k++) {
-    // console.log(_rule.actions);
     var _tmpAction = {
       action: {
         realName: _rule.actions[k].action.realName,
         type: _rule.actions[k].type
       },
       operator: _rule.actions[k].operator,
+      timing: _rule.actions[k].timing,
       parent: _rule.actions[k].parent,
+      nextElement: _rule.actions[k].nextElement,
       type: _rule.actions[k].type,
       value: _rule.actions[k].value,
       values: _rule.actions[k].values

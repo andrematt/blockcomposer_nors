@@ -16,18 +16,21 @@ export function getBlockDesc(block) {
       return "It is enough that one of the triggers joined by this operator is valid (in the same time window).";
       break;  
     case "not_dynamic":
-      return "Applies a negation on the trigger, with the possibility to specify a time window.";
+      return "'Not' block applies a negation on the trigger, with the possibility to specify a time window.";
       break;    
     case "rule":
       return "Insert triggers and actions in the corresponding spaces in the 'rule' block.";
       break;
     case "event":
-      return "Trigger labeled as events will be checked as punctual happenings in a time frame.";
+      return `Trigger labeled as events will be checked as punctual happenings in a time frame.<br><br>`;
       break;
     case "condition":
-      return "Trigger labeled as conditions will be checked as extended happenings in a time frame.";
+      return "Trigger labeled as conditions will be checked as extended happenings in a time frame.<br><br>";
       break;
     case "parallel_dynamic":
+      return "The actions inserted in the parallel branches will be started at the same time, independently of the other branches.";
+      break;
+    case "parallel":
       return "The actions inserted in the parallel branches will be started at the same time, independently of the other branches.";
       break;
     case "action_placeholder":

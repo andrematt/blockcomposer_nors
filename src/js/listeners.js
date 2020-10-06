@@ -1,17 +1,116 @@
 import {
   getWorkspace, checkInTriggerInfo, getTriggerList, getAllTriggerInWorkspace,
-  getBlockType, enable_after, disable_after, setTriggerList, getActionList,
+  getBlockType, setTriggerList, getActionList,
   setActionList, getRuleBlock, hasTriggerChild, getOperatorWithoutNextConn,
   checkIfTriggerOperator, getTriggerWithNoNextConnection, checkIfAction,
-  getNextViableBlockForAction, hasActionChild, setLastTrigger, getLastTrigger,
+  getNextViableBlockForAction, hasActionChild, setLastBlock, getLastBlock,
   exportSuggestorRule, clearSuggestionWorkspace,setRevertPossibility, 
-  extractChildRecursive, getRuleBlocksArr, cleanRuleBlocksArr, fireSuggestion
+  extractChildRecursive, getRuleBlocksArr, cleanRuleBlocksArr, 
+  ruleSuggestorManager, getSuggestionWorkspace, checkInTriggerOperators,
+  checkInActionOperators
 } from "./main.js";
 
-import { setActionRevert, removeActionRevert } from "./dom_modifiers.js";
-import { getBlockDesc } from "./blockDescriptions.js";
-import { checkConnection } from "./connectionsChecks.js";
-import { printError, cleanError } from "./compositionErrorMessages.js";
+import { 
+  printError, cleanError, afterTriggerMessage, afterActionMessage, 
+  afterTriggerOpMessage, afterActionOpMessage 
+} from "./textarea_manager.js";
+
+import { setActionRevert, removeActionRevert, moveSingleBlockToMain } from "./dom_modifiers.js";
+import { getBlockDesc } from "./block_descriptions.js";
+import { checkConnection } from "./connections_checks.js";
+
+
+/**
+ * 
+ * @param {*} event 
+ */
+export function secondaryWorkspaceLeftClick(event){
+  "use strict";
+  if (event.type === "ui") {
+    let workspace = getSuggestionWorkspace();
+    let block = workspace.blockDB_[event.blockId];
+    if (block) {
+      moveSingleBlockToMain(block);
+    }
+  }
+}
+
+/**
+ * 
+ * @param {*} event 
+ */
+export function addedTriggerToWorkspace(event){
+  "use strict";
+  let workspace = getWorkspace();
+  if (event.type && event.type === 'create') {
+    let block = workspace.blockDB_[event.blockId];
+    if (block) {
+      let lastBlock = getLastBlock();
+      if(lastBlock && block.id !== lastBlock.id && checkInTriggerInfo(block)){
+        afterTriggerMessage();
+        ruleSuggestorManager(block);
+      }
+    }
+  }
+}
+
+/**
+ * 
+ * @param {*} event 
+ */
+export function addedTriggerOpToWorkspace(event){
+  "use strict";
+  let workspace = getWorkspace();
+  if (event.type && event.type === 'create') {
+    let block = workspace.blockDB_[event.blockId];
+    if (block) {
+      let lastBlock = getLastBlock();
+      if(lastBlock && block.id !== lastBlock.id && checkInTriggerOperators(block)){
+        afterTriggerOpMessage();
+        ruleSuggestorManager(block);
+      }
+    }
+  }
+}
+
+/**
+ * 
+ * @param {*} event 
+ */
+export function addedActionToWorkspace(event){
+  "use strict";
+  let workspace = getWorkspace();
+  if (event.type && event.type === 'create') {
+    let block = workspace.blockDB_[event.blockId];
+    if (block) {
+      let lastBlock = getLastBlock();
+      if(lastBlock && block.id !== lastBlock && checkIfAction(block)){
+        afterActionOpMessage();
+        ruleSuggestorManager(block);
+      }
+    }
+  }
+}
+
+
+/**
+ * 
+ * @param {*} event 
+ */
+export function addedActionOpToWorkspace(event){
+  "use strict";
+  let workspace = getWorkspace();
+  if (event.type && event.type === 'create') {
+    let block = workspace.blockDB_[event.blockId];
+    if (block) {
+      let lastBlock = getLastBlock();
+      if(lastBlock && block.id !== lastBlock && checkInActionOperators(block)){
+        afterActionMessage();
+        ruleSuggestorManager(block);
+      }
+    }
+  }
+}
 
 /**
  * Listeners for get the blocks into the main "rule" block when ... ? 
@@ -33,30 +132,6 @@ export function ruleBlockChangesListener(event) {
   }
 }
 
-
-
-/**
- * Listener for the last inserted trigger in the workspace. NOT USED ANYMORE: 
- * recommandation is fired after rule checker
- */
-export function lastTriggerListener(event){
-  "use strict";
-  if (event.type && event.type === 'create') {
-    let workspace = getWorkspace();
-    let block = workspace.blockDB_[event.blockId];
-    if (block) {
-      if(block.isTrigger || block.isTriggerArray){
-        let lastTrigger = getLastTrigger();
-        if(lastTrigger !== block.type) {
-          setLastTrigger(block.type);
-          clearSuggestionWorkspace();
-          exportSuggestorRule();
-        }
-      }
-    }
-  }
-}
- 
 /**
  * Listener to perform connection check on the blocks and eventually print an
  * error message
@@ -75,7 +150,6 @@ export function autoCheckRule(event) {
         }
         else {
           cleanError();
-          fireSuggestion(block);
         }
       }
     }
@@ -406,37 +480,50 @@ export function parallelBranchesUpdateNumber(event) {
  * @param {*} event 
  */
 export function notBlockUpdate(event) {
+  console.log(event);
   "use strict";
   if (event.type === "change") {
     let workspace = getWorkspace();
     let relatedBlock = workspace.getBlockById(event.blockId);
     if (relatedBlock && (relatedBlock.isTrigger || relatedBlock.isTriggerArray)) {
       let branchInput = relatedBlock.getInput('not_input_statement');
+      console.log("NOT UPDATE")
       //se esiste l'input
       if (branchInput) {
-        let mainBlockConnection = branchInput.connection;
-        if (!mainBlockConnection.targetConnection) {
-          let notBlock = workspace.newBlock('not_dynamic');
-          let notBlockConnection = notBlock.previousConnection;
-          let mainBlockConnection = relatedBlock.getInput('not_input_statement').connection;
-          mainBlockConnection.connect(notBlockConnection);
-          notBlock.initSvg();
-          notBlock.render();
-        }
+      let mainBlockConnection = branchInput.connection;
+      if (!mainBlockConnection.targetConnection) {
+        let notBlock = workspace.newBlock('not_dynamic');
+        let notBlockConnection = notBlock.previousConnection;
+        let mainBlockConnection = relatedBlock.getInput('not_input_statement').connection;
+        mainBlockConnection.connect(notBlockConnection);
+        notBlock.initSvg();
+        notBlock.render();
       }
-      // rimuove tutti i blochi "not_dynamic" senza padre
-      else {
-        let db = workspace.blockDB_;
-        for (let item in db) {
-          if (db[item].type === "not_dynamic" && db[item].parentBlock_ === null) {
-            db[item].dispose();
-          }
-        }
-      }
+    }
     }
   }
 }
 
+
+/**
+ * 
+ * @param {} event 
+ */
+export function removeUnusedNotBlocks(event){
+  "use strict";
+  if (event.type === "change") {
+    let workspace = getWorkspace();
+    let relatedBlock = workspace.getBlockById(event.blockId);
+    if (relatedBlock && (relatedBlock.isTrigger || relatedBlock.isTriggerArray)) {
+    let db = workspace.blockDB_;
+    for (let item in db) {
+      if (db[item].type === "not_dynamic" && db[item].parentBlock_ === null) {
+        db[item].dispose();
+      }
+    }
+  }
+  }
+}
 
 
 /**
@@ -553,5 +640,29 @@ export function blockDisconnectListener(event) {
     let alreadyInArr = triggerList.findIndex(e => e.id === event.blockId);
     triggerList.splice(alreadyInArr, 1);
     return (triggerList);
+  }
+}
+
+
+
+/**
+ * Listener for the last inserted block in the workspace. 
+ * recommandation is fired after rule checker
+ */
+export function lastTriggerActionListener(event){
+  "use strict";
+  if (event.type && event.type === 'create') {
+    let workspace = getWorkspace();
+    let block = workspace.blockDB_[event.blockId];
+    if (block) {
+      let lastBlock = getLastBlock();
+      if(block.isTrigger || block.isTriggerArray || block.isAction) {
+        console.log("BLOCK ISTRIGGER/ACT")
+        if(lastBlock === undefined || lastBlock.id !== block.id) {
+          setLastBlock(block);
+          ruleSuggestorManager(block);
+        }
+      }
+    }
   }
 }

@@ -29,6 +29,14 @@ Blockly.JavaScript['action_parallel'] = function(block) {
   return 'TODO json';
 };
 
+Blockly.JavaScript['sequential'] = function(block) {
+  return 'TODO json';
+};
+
+Blockly.JavaScript['parallel'] = function(block) {
+  return 'TODO json';
+};
+
 Blockly.JavaScript['rule_revert'] = function(block) {
   return 'TODO json';
 };
