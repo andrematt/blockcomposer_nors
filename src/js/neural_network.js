@@ -46,16 +46,37 @@ function finishedTraining() {
 }
 
 // TODO: normalize and encode values going into predict?
-export async function classify(element_name, element_type, action_type, trigger_type, link_type, negation, next_element) {
-  let inputs = [element_name, element_type, action_type, trigger_type, link_type, negation, next_element];
+export async function classify(element_name, element_type, action_type, trigger_type, link_type, negation) {
+  let inputs = [element_name, element_type, action_type, trigger_type, link_type, negation];
+  console.log(inputs);
+  //try { 
+  let result = await neuralNetwork.classify(inputs, gotResults).then();
+  return result; 
+  //}
+  //catch (error){
+    //throw new Error('error');
+    //return "error";
+  //}
+  
+ /* 
+  try {
   let result = await neuralNetwork.classify(inputs).then();
+  console.log("NN RESUILTS FOR :", element_name);
+  console.log(result);
   //TODO error checking
   return result;
+  }
+  catch (error) {
+    console.log("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+    console.error(error);
+    return("error");
+  }
+  */
 }
 
 async function gotResults(err, results) {
   if (err) {
-    console.error(err);
+    throw new Error("Neural network: no results");
   } else {
     return results;
 }

@@ -17,6 +17,7 @@ const GLOBALS  = {
   actions : actions_url,
   db_access_url: db_access_url,
   appname: "pat",
+  gapi: {},
   nodeUrl: nodeUrl
 };
 

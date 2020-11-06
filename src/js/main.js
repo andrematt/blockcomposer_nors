@@ -8,8 +8,17 @@ import * as Dialog from "./custom_dialog.js";
 import * as DomModifiers from "./dom_modifiers.js";
 import * as errorMessages from "./textarea_manager.js";
 import * as neuralNetwork from "./neural_network.js";
-import {CPT} from "./CPT/index.js"
+import * as RS_values from "./rs_values.js";
+import { CPT } from "./CPT/index.js"
 
+/**
+ * TODO: 
+ * quando cancelli un elemento, se sei in modalità "step-by-step" i bottoni 
+ * vengono aggiornati, altrimenti no
+ * CONTROLLA IL NOT NELLE RACCOMANDAZIONI FULL
+ * removeToInputsFromEventTime dovrebbe essere eseguita anche quando viene 
+ * presa una regola dal Db... in futuro
+ */
 let currentUser;
 let myTriggers;
 let myActions;
@@ -18,13 +27,13 @@ let mySuggestionWorkspace;
 let myRule;
 let triggerBlocks;
 let actionBlocks;
+let ruleSequence;
 let ruleBlocksArr = [];
 let triggerCompleteInfo = [];
 let actionCompleteInfo = [];
 let triggersXml = "";
 let actionsXml = "";
 let lastBlocklyEvent = "";
-let toolboxTree;
 let existsChildNonTrigger = false;
 let existsChildNonAction = false;
 let existsChildTrigger = false;
@@ -37,6 +46,7 @@ let triggerList = [];
 let actionList = [];
 let lastBlock; // Last block inserted in workspace
 let CPTmodel;
+let ruleSuggestorStatus;
 let triggerInWorkspace = []; // keep the triggers in workspace TODO: listener for remove at delete
 // Array per le azioni composte da più parti ma da mostrare come una unità
 const multipleActions = ["Alarms", "Reminders", "video", "showImage"];
@@ -49,6 +59,7 @@ const actionOperators = ["parallel_dynamic", "sequential", "parallel"];
 const triggerTimeBlocks = ["day", "hour_min"];
 const actionSupportBlocks = ["parallel_dynamic", "action_placeholder", "sequential", "parallel"];
 let revertPossibility = "remove";
+let recommendationType = "Step by step recommendations";
 
 /**
  * Modulo di inizializzazione, pattern IIFE. Carica trigger e azioni, 
@@ -59,40 +70,61 @@ let revertPossibility = "remove";
   "use strict";
   console.log(Init);
   //console.log(window.Blockly.Blocks.procedures_callnoreturn.renameProcedure("test", "test2"));
-  initializeCPT(); 
-  initializeNN(); 
+  initializeCPT();
+  initializeNN();
   localStorageChecker();
   waitForTriggers();
   waitForActions();
+  initializeSuggestorButtons();
+  initializeSuggestorSelector();
   Dialog.overrideDialog();
 
+  async function initializeSuggestorButtons() {
+    let text = `
+ Start the editing of the trigger part selecting a trigger from the toolbox.
+    `;
+    document.getElementById('textarea-suggestion-expl').innerHTML = "";
+    document.getElementById('textarea-suggestion-expl').innerHTML = text;
+    document.getElementById("suggestor-and").onclick = function () { startRefineRule("and") };
+    document.getElementById("suggestor-or").onclick = function () { startRefineRule("or") };
+    document.getElementById("suggestor-not").onclick = function () { startRefineRule("not") };
+    document.getElementById("suggestor-action").onclick = function () { startRefineRule("rule") };
+    document.getElementById("suggestor-sequential").onclick = function () { startRefineRule("sequential") };
+    document.getElementById("suggestor-parallel").onclick = function () { startRefineRule("parallel") };
+  }
 
-/**
- * select all graphs from DB, convert them back in JS format, train the CPT 
- * model with them.
- */
-async function initializeCPT(){
-  "use strict"
-  let allSequences = await DB.getAllSequencesFromDB().then();
-  console.log(allSequences);
-  CPTmodel = new CPT();
-  let myData = allSequences.map( element => JSON.parse(element.rule_sequence));
-  CPTmodel.train(
-    myData // Training Data
-  );
-}
+  async function initializeSuggestorSelector() {
+    document.getElementById("suggestor-step-by-step").onclick = function () { setRecommendationType("step") };
+    document.getElementById("suggestor-full-rule").onclick = function () { setRecommendationType("full") };
+    document.getElementById("suggestor-none").onclick = function () { setRecommendationType("none") };
+  }
 
-/**
- * select all the element/attribute row in the elAtt table, train the NN model
- */
-async function initializeNN(){
-  "use strict"
-  let allElementAtt = await DB.getAllElementAttFromDB().then();
-  console.log(allElementAtt);
-  let arrayedAllElementAtt = convertElementAttInArr(allElementAtt);
-  console.log(arrayedAllElementAtt);
-  neuralNetwork.train(arrayedAllElementAtt);
-}
+  /**
+   * select all graphs from DB, convert them back in JS format, train the CPT 
+   * model with them.
+   */
+  async function initializeCPT() {
+    "use strict"
+    let allSequences = await DB.getAllSequencesFromDB().then();
+    console.log(allSequences);
+    CPTmodel = new CPT();
+    let myData = allSequences.map(element => JSON.parse(element.rule_sequence));
+    CPTmodel.train(
+      myData // Training Data
+    );
+  }
+
+  /**
+   * select all the element/attribute row in the elAtt table, train the NN model
+   */
+  async function initializeNN() {
+    "use strict"
+    let allElementAtt = await DB.getAllElementAttFromDB().then();
+    console.log(allElementAtt);
+    let arrayedAllElementAtt = convertElementAttInArr(allElementAtt);
+    console.log(arrayedAllElementAtt);
+    neuralNetwork.train(arrayedAllElementAtt);
+  }
 
 
   /**
@@ -248,7 +280,7 @@ async function initializeNN(){
     }
   }
   /**
-   * Crea dinamicante il blocco per un'azione normale
+   * Crea dinamicamente il blocco per un'azione normale
    * @param {*} block 
    * @param {*} name 
    * @param {*} parentName 
@@ -390,38 +422,36 @@ async function initializeNN(){
 
       },
       mutationToDom: function () { //registra in blockly la modifica
-        if(this.timing === "sustained") {
-        let container = document.createElement('mutation');
-        let revertPossibility = getRevertPossibility();
-        container.setAttribute('revert', revertPossibility);
-        return container;
+        if (this.timing === "sustained") {
+          let container = document.createElement('mutation');
+          let revertPossibility = getRevertPossibility();
+          container.setAttribute('revert', revertPossibility);
+          return container;
         }
       },
       domToMutation: function () { //fa effettivamente cambiare forma
-        if(this.timing === "sustained") {
-        let revertPossibility = getRevertPossibility();
-        // Updateshape è una helper function: non deve essere chiamata direttamente ma 
-        // tramite domToMutation, altrimenti non viene registrato che il numero di 
-        // inputs è stato modificato
-        if(revertPossibility) {
-          this.updateShape_(revertPossibility);
+        if (this.timing === "sustained") {
+          let revertPossibility = getRevertPossibility();
+          // Updateshape è una helper function: non deve essere chiamata direttamente ma 
+          // tramite domToMutation, altrimenti non viene registrato che il numero di 
+          // inputs è stato modificato
+          if (revertPossibility) {
+            this.updateShape_(revertPossibility);
+          }
         }
-      }
       },
-    
+
       updateShape_: function (passedValue) {
-        if(passedValue === "add") {
+        if (passedValue === "add") {
           this.appendDummyInput("ACTION_REVERT")
-         //.appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/revert.png", 25, 25, "revert"));
-        .appendField("What to do when the condition ends?")
-        .appendField(new Blockly.FieldDropdown([["Restore the previous device state","revert"], ["Do not restore","keep"]]), "revert");
-        //.appendField(new Blockly.FieldDropdown([["Restore the previous device state","revert"], ["Do not restore","keep"]]));
+            .appendField("What to do when the condition ends?")
+            .appendField(new Blockly.FieldDropdown([["Restore the previous device state", "revert"], ["Do not restore", "keep"]]), "revert");
         }
-        else if(passedValue==="remove"){
+        else if (passedValue === "remove") {
           let input = this.getInput("ACTION_REVERT");
           //block.setTooltip('The status of this device will be reverted when the condition will not be valid anymore');
           if (input) {
-          this.removeInput("ACTION_REVERT");
+            this.removeInput("ACTION_REVERT");
           }
         }
       }
@@ -501,7 +531,7 @@ async function initializeNN(){
         //.setCheck(null)
 
         .appendField(new Blockly.FieldDropdown(valuesArray), "TRIGGER_OP")
-        .appendField(new Blockly.FieldDropdown([["entrance", "ENTRANCE"], ["kitchen", "KITCHEN"], ["bedroom", "BEDROOM"], ["bathroom", "BATHROOM"], ["living room", "LIVINGROOM"], ["corridor", "CORRIDOR"]]), "TRIGGER_VALUE")
+        .appendField(new Blockly.FieldDropdown([["house", "HOUSE"], ["entrance", "ENTRANCE"], ["kitchen", "KITCHEN"], ["bedroom", "BEDROOM"], ["bathroom", "BATHROOM"], ["living room", "LIVINGROOM"], ["corridor", "CORRIDOR"]]), "TRIGGER_VALUE")
       /*
       block.appendDummyInput("CHOOSE_FROM_SELECT")
         //.setCheck(null)
@@ -524,7 +554,7 @@ async function initializeNN(){
    */
   function createStandardTrigger(block, passedLeafData, name, parentName, checkbox) {
     const leafData = passedLeafData;
-    Object.freeze(leafData);
+    //Object.freeze(leafData);
     //console.log(leafData);
     //console.log(name);
     //console.log(parentName);
@@ -534,7 +564,7 @@ async function initializeNN(){
     block.appendValueInput("TRIGGER_TYPE");
     //.appendField("Trigger type:");
     let dimensionId = "" + leafData.categoryDimensionId;
-    
+
     block.appendDummyInput("BLOCK_HEADER")
       .appendField(new Blockly.FieldLabel(name, "block-name"))
       .appendField(name, "displayed_name")
@@ -575,6 +605,23 @@ async function initializeNN(){
       block.appendDummyInput()
         .appendField(new Blockly.FieldTextInput("Medicine name"), "MEDICINE_NAME")
         .appendField("taken", "MEDICINE_TAKEN");
+    }
+
+    if (leafData.realName === "speechRecognition") {
+      block.getField("displayed_name").setVisible(false);
+      block.appendDummyInput()
+        .appendField(new Blockly.FieldTextInput("speech"), "SPEECH")
+      //.appendField("taken", "MEDICINE_TAKEN");
+    }
+
+    if (leafData.realName === "rain") {
+      block.appendDummyInput()
+        .appendField("True")
+    }
+
+    if (leafData.realName === "snow") {
+      block.appendDummyInput()
+        .appendField("True")
     }
 
 
@@ -626,12 +673,14 @@ async function initializeNN(){
 
     else if (leafData.type === "TIME") {
       block.getField("displayed_name").setText("Time between: ");
-      block.appendDummyInput()
+      block.appendDummyInput("START_TIME_LABEL")
         .appendField("start: ")
+      block.appendDummyInput("START_TIME_HOUR")
         .appendField(new Blockly.FieldDropdown([["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"],
         ["04", "04"], ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"], ["10", "10"],
         ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"], ["15", "15"], ["16", "16"], ["17", "17"],
-        ["18", "18"], ["19", "19"], ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"]]), "Hours")
+        ["18", "18"], ["19", "19"], ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"]]), "START_HOURS");
+      block.appendDummyInput("START_TIME_MIN")
         .appendField(new Blockly.FieldDropdown([["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"], ["04", "04"],
         ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"],
         ["10", "10"], ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"],
@@ -644,12 +693,16 @@ async function initializeNN(){
         ["45", "45"], ["46", "46"], ["47", "47"], ["48", "48"], ["49", "49"],
         ["50", "50"], ["51", "51"], ["52", "52"], ["53", "53"], ["54", "54"],
         ["55", "55"], ["56", "56"], ["57", "57"], ["58", "58"], ["59", "59"]
-        ]), "Mins")
-        .appendField("end: ")
+        ]), "START_MINS");
+
+      block.appendDummyInput("END_TIME_LABEL")
+        .appendField("end: ");
+      block.appendDummyInput("END_TIME_HOUR")
         .appendField(new Blockly.FieldDropdown([["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"],
         ["04", "04"], ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"], ["10", "10"],
         ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"], ["15", "15"], ["16", "16"], ["17", "17"],
-        ["18", "18"], ["19", "19"], ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"]]), "Hours")
+        ["18", "18"], ["19", "19"], ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"]]), "END_HOURS");
+      block.appendDummyInput("END_TIME_MIN")
         .appendField(new Blockly.FieldDropdown([["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"], ["04", "04"],
         ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"],
         ["10", "10"], ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"],
@@ -662,21 +715,31 @@ async function initializeNN(){
         ["45", "45"], ["46", "46"], ["47", "47"], ["48", "48"], ["49", "49"],
         ["50", "50"], ["51", "51"], ["52", "52"], ["53", "53"], ["54", "54"],
         ["55", "55"], ["56", "56"], ["57", "57"], ["58", "58"], ["59", "59"]
-        ]), "Mins");
+        ]), "END_MINS");
+
+      block.appendDummyInput()
+        .appendField(" NOT: ")
+        .appendField(checkbox, 'not_input');
       /*
-      block.appendValueInput("START_TIME")
-        .setCheck(null)
-        .appendField("Start time", "START_TIME");
-      block.appendValueInput("END_TIME")
-        .setCheck(null)
-        .appendField("End time", "END_TIME");
-        */
+         block.appendDummyInput("START_TIME")
+         .appendField("Start time")
+         .appendField(new Blockly.FieldNumber(12, 0, 24), "START_HOUR")
+         .appendField(":")
+         .appendField(new Blockly.FieldNumber(30, 0, 60), "START_MIN");
+       block.appendDummyInput("END_TIME")
+         .appendField("End time")
+         .appendField(new Blockly.FieldNumber(12, 0, 24), "END_HOUR")
+         .appendField(":")
+         .appendField(new Blockly.FieldNumber(30, 0, 60), "END_MIN");
+  */
     }
 
     else if (leafData.type === "DATE") {
       block.appendDummyInput()
-
         .appendField(new Blockly.FieldDate());
+      block.appendDummyInput()
+        .appendField(" NOT: ")
+        .appendField(checkbox, 'not_input');
       //block.appendValueInput("DATE")
       // .setCheck(null)
       // .appendField("Date", "DATE");
@@ -764,7 +827,7 @@ async function initializeNN(){
     let newTree =
       `
   <xml id="toolbox" style="display: none">
-  <category colour="0" name="Rule blocks">
+  <category colour="0" name="Rule block">
     <block type="rule"></block>
   </category>
   <sep gap = "8"></sep>
@@ -775,7 +838,6 @@ async function initializeNN(){
   <category name="Trigger operators" colour="210">
       <block type="and"></block>
       <block type="or"></block>
-      <block type="group"></block>
   </category>
   <sep gap = "8"></sep>
   <category name="Action list" colour="#069975">
@@ -785,15 +847,15 @@ async function initializeNN(){
   <category name="Action operators" colour="150">
     <block type="sequential"></block>
     <block type="parallel"></block>
-    <block type="parallel_dynamic"></block>
   </category>
   <sep gap = "8"></sep>
 </xml>
 ` ;
 
-    //console.log(newTree);
-    let treeCopy = JSON.parse(JSON.stringify(newTree));
-    toolboxTree = treeCopy;
+    //let treeCopy = JSON.parse(JSON.stringify(newTree));
+    //toolboxTree = treeCopy;
+    //something is broken in newTree
+    console.log(newTree);
     workspace.updateToolbox(newTree);
 
     //aggiorna anche l'xml!!
@@ -884,6 +946,30 @@ async function initializeNN(){
   }
 
   /**
+   * replace unsafe chars
+   * @param {*} unsafe 
+   */
+function escapeXml(unsafe) {
+  let result;
+  try {
+    result = unsafe.replace(/[<>&'"]/g, function (c) {
+        switch (c) {
+            case '<': return '&lt;';
+            case '>': return '&gt;';
+            case '&': return '&amp;';
+            case '\'': return '&apos;';
+            case '"': return '&quot;';
+        }
+    });
+    return result;
+  }
+  catch (e){
+    console.log(e);
+    console.log(unsafe);
+  }
+}
+
+  /**
    * Crea ricorsivamente l'albero dei trigger
    * @param {*} data 
    * @param {*} xml 
@@ -900,7 +986,7 @@ async function initializeNN(){
         //top level category
         for (let cat in data) {
           triggersXml += `
-            <category colour="#065699" name="${cat}">
+            <category colour="#065699" name="${escapeXml(cat)}">
           `;
           loadTriggersToolboxRecursive(data[cat], xml);
           triggersXml += `
@@ -911,7 +997,7 @@ async function initializeNN(){
       else if (data.nodes !== undefined) {
         //middle level category
         triggersXml += `
-          <category colour="#065699" name="${data.englishDisplayedName}">
+          <category colour="#065699" name="${escapeXml(data.englishDisplayedName)}">
         `;
 
         loadTriggersToolboxRecursive(data.nodes, xml);
@@ -921,25 +1007,25 @@ async function initializeNN(){
       }
       else if (data.attributes !== undefined) {
         //terminal leaf     
-        const categoryName = data.englishDisplayedName;
-        const categoryRealName = data.realName;
+        const categoryName = escapeXml(data.englishDisplayedName);
+        const categoryRealName = escapeXml(data.realName);
         triggersXml += `
           <category colour="#065699" name="${categoryName}">
         `;
         for (let i = 0; i < data.attributes.length; i++) {
-          let blockName = categoryRealName + "-" + data.attributes[i].realName;
+          let blockName = categoryRealName + "-" + escapeXml(data.attributes[i].realName);
           createTriggerDinamically(data.attributes[i], blockName);
           //se non fa parte della lista, disegna normalmente tutti gli
           //attributi come nodi foglia
           if (multipleTriggers.indexOf(data.realName) === -1) {
             triggersXml += ` 
-              <block category = "${categoryName}" type="${blockName}" type2="${data.attributes[i].realName}"></block>
+              <block category = "${categoryName}" type="${blockName}" type2="${escapeXml(data.attributes[i].realName)}"></block>
             `;
             triggerList.push(blockName);
             const myInfo = {
               fullName: blockName,
               categoryName: categoryName,
-              realName: data.attributes[i].realName
+              realName: escapeXml(data.attributes[i].realName)
             };
             triggerCompleteInfo.push(myInfo);
             //triggerList.push(data.attributes[i].realName);
@@ -948,13 +1034,13 @@ async function initializeNN(){
           else {
             if (i === 0) {
               triggersXml += ` 
-                <block category = "${categoryName}" type="${blockName}" type2="${data.attributes[i].realName}"></block>
+                <block category = "${categoryName}" type="${blockName}" type2="${escapeXml(data.attributes[i].realName)}"></block>
               `;
               triggerList.push(blockName);
               const myInfo = {
                 fullName: blockName,
                 categoryName: categoryName,
-                realName: data.attributes[i].realName
+                realName: escapeXml(data.attributes[i].realName)
               };
               triggerCompleteInfo.push(myInfo);
               //triggerList.push(data.attributes[i].realName);
@@ -1051,12 +1137,20 @@ async function initializeNN(){
 
   // Registrazione dei listeners
   //workspace.addChangeListener(Listeners.triggerTypeListenerParent);
-  
-  //workspace.addChangeListener(Listeners.addToCorrectBlock);
+
   // Main workspace listeners 
 
-
-  workspace.addChangeListener(Listeners.lastTriggerActionListener); 
+  // listeners to place blocks selected from toolbox on the correct position 
+  // in the workspace. Works if the blocks are clicked, but if they are dragged 
+  // crashes. Don't know how to fix this.
+  workspace.addChangeListener(Listeners.addedTriggerToWorkspace);
+  workspace.addChangeListener(Listeners.addedActionToWorkspace);
+  workspace.addChangeListener(Listeners.addedTriggerOpToWorkspace);
+  workspace.addChangeListener(Listeners.addedActionOpToWorkspace);
+  workspace.addChangeListener(Listeners.eventListenerForTimeTrigger);
+  workspace.addChangeListener(Listeners.addedBlockToWorkspace);
+  workspace.addChangeListener(Listeners.removedBlockFromWorkspace);
+  workspace.addChangeListener(Listeners.lastTriggerActionListener);
   workspace.addChangeListener(Listeners.notBlockUpdate);
   workspace.addChangeListener(Listeners.triggerTypeListenerChild);
   workspace.addChangeListener(Listeners.blockDisconnectListener);
@@ -1064,16 +1158,14 @@ async function initializeNN(){
   workspace.addChangeListener(Listeners.parallelBranchesUpdateNumber);
   workspace.addChangeListener(Listeners.waitToParallelListener);
   workspace.addChangeListener(Listeners.updateCodeListener);
-  workspace.addChangeListener(Listeners.blockDocsListener);
+  //  workspace.addChangeListener(Listeners.blockDocsListener);
   workspace.addChangeListener(Listeners.ruleTypeListener);
   workspace.addChangeListener(Listeners.removeUnusedNotBlocks);
-  //workspace.addChangeListener(Listeners.addedTriggerOpToWorkspace);
-  //workspace.addChangeListener(Listeners.addedActionOpToWorkspace);
   workspace.addChangeListener(Listeners.autoCheckRule);
 
   //suggestion workspace listeners
   suggestionWorkspace.addChangeListener(Listeners.secondaryWorkspaceLeftClick);
-  
+
   myWorkspace = workspace;
   mySuggestionWorkspace = suggestionWorkspace;
 })();
@@ -1358,19 +1450,53 @@ function getFirstTrigger() {
 }
 
 /**
- * Gets all "trigger" and "action" elements in the workspace
+ * Get the list of block elements in the workspace, sort them
+ * @param {*} blocks 
+ * @param {*} triggerInfo 
+ * @param {*} actionInfo 
  */
-export function getElementsInWorkspace(){
-  let ws = getWorkspace();
-  //ottiene tutti i blocchi dal workspace, ordinati secondo la posizione
-  let blocks  = ws.getAllBlocks(true);
-  const triggerInfo = getTriggerInfo();
-  const actionInfo = getActionInfo();
-  let ruleElements = {};
+function getSortedBlocks(blocks, triggerInfo = getTriggerInfo(), actionInfo = getActionInfo()) {
+  let pulledOutTriggers = [];
+  let pulledOutActions = [];
+  let pulledOutTriggersWithId = [];
+  let pulledOutActionsWithId = [];
   let triggers = [];
   let actions = [];
-  let elements;
-  for(let i = 0; i < blocks.length; i++){
+  let triggersWithId = [];
+  let actionsWithId = [];
+  let ruleBlockIndex = -1;
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].type === "rule") {
+      ruleBlockIndex = i;
+      break;
+    }
+  }
+  if (ruleBlockIndex === -1) {
+    return blocks;
+  }
+  for (let i = 0; i < ruleBlockIndex; i++) {
+    let type = blocks[i].type;
+    let triggerEntry = triggerInfo.find((o, i) => {
+      if (o.fullName === type) {
+        return o;
+      }
+    });
+    if (triggerEntry) {
+      pulledOutTriggers.push(triggerEntry.fullName);
+      pulledOutTriggersWithId.push({ name: triggerEntry.fullName, id: blocks[i].id });
+      continue;
+    }
+    let actionEntry = actionInfo.find((o, i) => {
+      if (o.fullName === type) {
+        return o;
+      }
+    });
+    if (actionEntry) {
+      pulledOutActions.push(actionEntry.fullName);
+      pulledOutActionsWithId.push({ name: actionEntry.fullName, id: blocks[i].id });
+    }
+  }
+  for (let i = ruleBlockIndex; i < blocks.length; i++) {
     let type = blocks[i].type;
     let triggerEntry = triggerInfo.find((o, i) => {
       if (o.fullName === type) {
@@ -1379,6 +1505,7 @@ export function getElementsInWorkspace(){
     });
     if (triggerEntry) {
       triggers.push(triggerEntry.fullName);
+      triggersWithId.push({ name: triggerEntry.fullName, id: blocks[i].id });
       continue;
     }
     let actionEntry = actionInfo.find((o, i) => {
@@ -1388,53 +1515,104 @@ export function getElementsInWorkspace(){
     });
     if (actionEntry) {
       actions.push(actionEntry.fullName);
+      actionsWithId.push({ name: actionEntry.fullName, id: blocks[i].id });
     }
-  };
-  ruleElements.triggers = triggers;
-  ruleElements.actions = actions;
-  elements = triggers.concat(actions);
-  ruleElements.elements = elements;
-  return ruleElements;
+  }
+  let concatTriggers = triggers.concat(pulledOutTriggers);
+  let concatActions = actions.concat(pulledOutActions);
+  let concatElements = concatTriggers.concat(concatActions);
+  let concatTriggersWithId = triggersWithId.concat(pulledOutTriggersWithId);
+  let concatActionsWithId = actionsWithId.concat(pulledOutActionsWithId);
+  let concatElementsWithId = concatTriggersWithId.concat(concatActionsWithId);
+  let elements = {
+    triggers: concatTriggers,
+    actions: concatActions,
+    elements: concatElements,
+    elementsWithId: concatElementsWithId
+  }
+  console.log(elements);
+  return elements;
 }
-  
+
+/**
+ * get the rule sequence
+ */
+export function getRuleSequence() {
+  return ruleSequence;
+}
+
+
+/**
+ * Gets all "trigger" and "action" elements in the workspace. Try to sort them 
+ * moving out the trigger and action placed before the rule element, and 
+ * placing them at the end of the trigger/action sequence.
+ */
+export function setRuleSequence() {
+  let ws = getWorkspace();
+  //ottiene tutti i blocchi dal workspace, ordinati secondo la posizione
+  let blocks = ws.getAllBlocks(true);
+  const triggerInfo = getTriggerInfo();
+  const actionInfo = getActionInfo();
+  let sortedBlocks = getSortedBlocks(blocks, triggerInfo, actionInfo);
+  //return sortedBlocks;
+  ruleSequence = sortedBlocks;
+}
+
+/**
+ * 
+ */
+export function resetRuleSequence() {
+  let sequence = {
+    triggers: [],
+    actions: [],
+    elements: [],
+    elementsWithId: []
+  }
+  ruleSequence = sequence;
+}
+
+/**
+ * 
+ */
+export function resetLastBlock() {
+  lastBlock = undefined;
+}
+
 /**
  * 
  * @param {*} linkType 
  */
-export function startRefineRule(linkType){
-  let lastBlock = getLastBlock(); 
+export function startRefineRule(linkType) {
+  let lastBlock = getLastBlock();
   console.log(lastBlock);
-  if(linkType==="and"){
+  if (linkType === "and") {
     console.log("AND")
     DomModifiers.addOperatorToBlock(lastBlock, linkType)
-    errorMessages.clearSuggestorTextarea();
+    //errorMessages.cleanTextAreaExplainations(); //which textarea?
     ruleSuggestorManager(lastBlock, true, linkType);
   }
-  else if(linkType==="or"){
+  else if (linkType === "or") {
     DomModifiers.addOperatorToBlock(lastBlock, linkType)
-    errorMessages.clearSuggestorTextarea();
+    //errorMessages.cleanTextAreaExplainations();
     ruleSuggestorManager(lastBlock, true, linkType);
   }
-  else if(linkType==="not"){
+  else if (linkType === "not") {
     DomModifiers.addNegationToBlock(lastBlock);
     //errorMessages.afterNotMessage();
     ruleSuggestorManager(lastBlock, true, linkType);
   }
-  else if(linkType==="rule"){
+  else if (linkType === "rule") {
+    errorMessages.startActionEditing();
     ruleSuggestorManager(lastBlock, true, linkType);
   }
-  else if(linkType==="sequential"){
+  else if (linkType === "sequential") {
     DomModifiers.addOperatorToBlock(lastBlock, linkType)
-    errorMessages.clearSuggestorTextarea();
+    //errorMessages.cleanTextAreaExplainations();
     ruleSuggestorManager(lastBlock, true, linkType);
   }
-  else if(linkType==="parallel"){
+  else if (linkType === "parallel") {
     DomModifiers.addOperatorToBlock(lastBlock, linkType)
-    errorMessages.clearSuggestorTextarea();
-    ruleSuggestorManager(lastBlock, true, linkType);
-  }
-  else if(linkType==="end"){
-    errorMessages.clearSuggestorTextarea();
+    //errorMessages.cleanTextAreaExplainations();
     ruleSuggestorManager(lastBlock, true, linkType);
   }
 }
@@ -1443,47 +1621,227 @@ export function startRefineRule(linkType){
  * We will fire recommendation each time. Eventually, add checks here.  
  * @param {*} block 
  */
-function checkRecommendationConditions(block){
+function checkRecommendationConditions(block) {
   return true;
 }
 
+/**
+ * 
+ */
+export function getRuleSuggestorStatus() {
+  return ruleSuggestorStatus;
+}
 
 /**
  * Extract elements in workspace, decide if fire a standard (only CPT) or a 
  * refined (CPT + Neural network) suggestion on the last rule element (trigger 
  * or action) inserted.  
  */
-export async function ruleSuggestorManager(lastBlock, refined = false, linkType){
+export async function ruleSuggestorManager(lastBlock = getLastBlock(), refined = false, linkType) {
   console.log("RULE SUGGESTOR MANAGER");
   console.log(lastBlock.type);
   console.log(refined);
-  let elementsInWorkspace = getElementsInWorkspace();
- if (elementsInWorkspace.elements.length === 0){
+  let elementsInWorkspace = getRuleSequence();
+  if (elementsInWorkspace.elements.length === 0) {
     errorMessages.suggestorErrorMessages("noElements");
     return;
   }
-  else if(checkRecommendationConditions(lastBlock)){ 
-    if(refined && checkInTriggerInfoWithName(lastBlock.type)){
-      fireFullDataRec(lastBlock, "trigger", elementsInWorkspace.elements, linkType);
-      textareaMessagesManager(lastBlock, linkType, "full");
+  if (recommendationType === "Step by step recommendations") {
+    if (checkRecommendationConditions(lastBlock)) {
+      if (refined && checkInTriggerInfoWithName(lastBlock.type)) {
+        await fireFullDataRec(lastBlock, "trigger", elementsInWorkspace.elements, linkType).then();
+        textareaMessagesManager(lastBlock, linkType, "full");
+        ruleSuggestorStatus = "full";
+      }
+      else if (refined && checkInActionInfoOnlyName(lastBlock.type)) {
+        await fireFullDataRec(lastBlock, "action", elementsInWorkspace.elements, linkType).then();
+        textareaMessagesManager(lastBlock, linkType, "full");
+        ruleSuggestorStatus = "full";
+      }
+      else if (checkInTriggerInfoWithName(lastBlock.type)) {
+        fireOnlySequenceRec(elementsInWorkspace.elements, "trigger", lastBlock);
+        textareaMessagesManager(lastBlock, linkType, "onlySeq");
+        ruleSuggestorStatus = "seq";
+      }
+      else if (checkInActionInfoOnlyName(lastBlock.type)) {
+        fireOnlySequenceRec(elementsInWorkspace.elements, "action", lastBlock);
+        textareaMessagesManager(lastBlock, linkType, "onlySeq");
+        ruleSuggestorStatus = "seq";
+      }
+      else {
+        errorMessages.suggestorErrorMessages("noElements");
+      }
     }
-    else if(refined && checkInActionInfoOnlyName(lastBlock.type)){
-      fireFullDataRec(lastBlock, "action", elementsInWorkspace.elements, linkType);
-      textareaMessagesManager(lastBlock, linkType, "full");
+  }
+  else if (recommendationType === "Full rule recommendations") {
+    let topRecs = await fireRecommendationForFullRule(elementsInWorkspace.elements, lastBlock).then();
+    console.log("TOP Recs!!");
+    console.log(topRecs);
+    if (refined) {
+      if (lastBlock.blockType === "trigger") {
+        if (linkType === "not") {
+          errorMessages.afterNotMessage();
+        }
+        else {
+          errorMessages.afterTriggerOpMessage();
+        }
+      }
+      else {
+        errorMessages.afterActionOpMessage();
+      }
     }
-    else if(checkInTriggerInfoWithName(lastBlock.type)){
-      fireOnlySequenceRec(elementsInWorkspace.elements, "trigger");
-      textareaMessagesManager(lastBlock, linkType, "onlySeq");
+    else {
+      if (lastBlock.blockType === "trigger") {
+        errorMessages.afterTriggerMessage();
+      }
+      else {
+        errorMessages.afterActionMessage();
+      }
     }
-    else if(checkInActionInfoOnlyName(lastBlock.type)){
-      fireOnlySequenceRec(elementsInWorkspace.elements, "action"); 
-      textareaMessagesManager(lastBlock, linkType, "onlySeq");
+    if (topRecs) {
+      let rules = [];
+      for (let i = 0; i < topRecs.length; i++) {
+        let rule = await DB.getOneFromDB(topRecs[i].id).then();
+        rules.push(rule);
+      }
+      console.log(rules);
+      if (rules.length > 0) { //this check is already done when the CPT results are obtained
+        DomModifiers.rulesToSuggestionWorkspace(rules);
+        removeUnusedInputsFromSecondaryWorkspace();
+      }
     }
-    else{
-      errorMessages.suggestorErrorMessages("noElements");
+    else if (recommendationType === "None") {
+      // message.. todo
+    }
+    else {
+      errorMessages.suggestorErrorMessages("noSuggestion")
     }
   }
 }
+
+/**
+ * Obtain the 5 top recommendations via CPT, add each of them to the already 
+ * inserted sequence. Then, foreeach new sequence obtained, loops on each rule 
+ * saved in the database, to check the one that best fits the new sequence.  
+ * Then, this top5 rules is filter to remove duplicate rules and returned. 
+ * @param {*} sequence 
+ */
+async function fireRecommendationForFullRule(sequence, lastBlock) {
+  let CPTpredictions = obtainSequenceRec(sequence, RS_values.getPreviousElementToConsider_CPT(), 5);
+  console.log(CPTpredictions);
+  let CPTpredictionsCheck = [];
+  //Obtain a list of sequences with added the rule element obtained with CPT
+  if (CPTpredictions[0] && CPTpredictions[0].length > 0) { //horrible error handling
+    CPTpredictionsCheck = CPTpredictions[0];
+    errorMessages.cleanTextAreaAlerts();
+  }
+  if (CPTpredictionsCheck.length === 0) { //if no results, only fire CPT for the last inserted element
+    let CPTpredictions = obtainSequenceRec([lastBlock.type], RS_values.getPreviousElementToConsider_CPT(), 5);
+    if (CPTpredictions[0] && CPTpredictions[0].length > 0) { //horrible error handling
+      CPTpredictionsCheck = CPTpredictions[0];
+      errorMessages.cleanTextAreaAlerts();
+    }
+    else {
+      errorMessages.suggestorErrorMessages("noSuggestions");
+      return;
+    }
+  }
+  // create 5 sequence comprised by the element inserted by the user and the 
+  // top cpt suggestions
+  let sequenceWithCPTresults = [];
+  for (let i = 0; i < CPTpredictionsCheck.length; i++) {
+    let actualElement = [...sequence];
+    actualElement.push(CPTpredictionsCheck[i][0]);
+    sequenceWithCPTresults.push(actualElement);
+  }
+  console.log(sequenceWithCPTresults);
+  //get all rules from DB 
+  let allSequences = await DB.getAllSequencesFromDB().then();
+  console.log(allSequences);
+  allSequences.map((e) => {
+    e.rule_sequence = JSON.parse(e.rule_sequence);
+  });
+  console.log(allSequences);
+  //aggiungi ad ogni rule (allSequence) lo score ottenuto
+  //fai sort per score e restituisci prime 5 lo score ottenuto
+  // Alternative method, does not work
+  /*
+    for (let i = 0; i<allSequences.length; i++){
+      let score = 0;
+      let setA = new Set(allSequences[i].rule_sequence);
+      for(let j = 0; j < sequenceWithCPTresults.length; j++){
+        let setB = new Set(sequenceWithCPTresults[j]);
+        let myScore = jaccard(setA, setB);
+        score += myScore;
+      }
+      allSequences[i].score = score;
+    }
+    console.log(allSequences);
+    let sorted = allSequences.sort( (a, b) => {
+      return b.score - a.score; 
+    })
+    console.log(sorted);
+    let top5 = sorted.slice(0,5);
+    return top5;
+    */
+  //get the most similar to the ones on the prev. step using Jaccard
+  let topForeachCPTsuggestions = [];
+  for (let i = 0; i < sequenceWithCPTresults.length; i++) {
+    let myBestScore = -1;
+    let best;
+    let setA = new Set(sequenceWithCPTresults[i]);
+    for (let j = 0; j < allSequences.length; j++) {
+      let setB = new Set(allSequences[j].rule_sequence);
+      let myScore = jaccard(setA, setB);
+      if (myScore > myBestScore) {
+        best = allSequences[j];
+        myBestScore = myScore;
+      }
+    }
+    if (best) {
+      topForeachCPTsuggestions.push(best);
+    }
+  }
+  console.log(topForeachCPTsuggestions);
+  //filter repeated recs
+  let uniqueIds = [];
+  let uniqueRecs = [];
+  for (let i = 0; i < topForeachCPTsuggestions.length; i++) {
+    let myId = topForeachCPTsuggestions[i].id;
+    if (!uniqueIds.includes(myId)) {
+      uniqueIds.push(myId);
+      uniqueRecs.push(topForeachCPTsuggestions[i]);
+    }
+  }
+  console.log(uniqueRecs);
+  return uniqueRecs;
+}
+
+/**
+ * Indice di Jaccard tra 2 set
+ * @param {*} setA 
+ * @param {*} setB 
+ */
+function jaccard(setA, setB) {
+  "use strict";
+  // intersezione (overlap) dei due insiemi
+  const intersection = new Set(
+    [...setA].filter(e => setB.has(e))
+  );
+  // unione dei due insiemi 
+  const union = new Set();
+  setA.forEach(e => {
+    union.add(e);
+  });
+  setB.forEach(e => {
+    union.add(e);
+  });
+  const numerator = intersection.size;
+  const denominator = union.size;
+  const score = numerator / denominator;
+  return score;
+}
+
 
 /**
  *  
@@ -1491,26 +1849,26 @@ export async function ruleSuggestorManager(lastBlock, refined = false, linkType)
  * @param {*} blockType 
  * @param {*} linkType 
  */
-function textareaMessagesManager(lastBlock, linkType, recType){
-  if(recType === "onlySeq"){
-    if(lastBlock.blockType === "trigger"){
-     errorMessages.afterTriggerMessage(); 
+function textareaMessagesManager(lastBlock, linkType, recType) {
+  if (recType === "onlySeq") {
+    if (lastBlock.blockType === "trigger") {
+      errorMessages.afterTriggerMessage();
     }
     else {
-     errorMessages.afterActionMessage(); 
+      errorMessages.afterActionMessage();
     }
   }
-  else if(recType === "full"){
-    if(linkType === "and" || linkType === "or"){
+  else if (recType === "full") {
+    if (linkType === "and" || linkType === "or") {
       errorMessages.afterTriggerOpMessage();
     }
-    else if (linkType === "not"){
-       errorMessages.afterNotMessage();
+    else if (linkType === "not") {
+      errorMessages.afterNotMessage();
     }
-    else if(linkType === "sequential" || linkType === "parallel"){
+    else if (linkType === "sequential" || linkType === "parallel") {
       errorMessages.afterActionOpMessage();
     }
-    else if(linkType === "rule"){
+    else if (linkType === "rule") {
       errorMessages.startActionEditing();
     }
   }
@@ -1523,37 +1881,56 @@ function textareaMessagesManager(lastBlock, linkType, recType){
  * @param {*} lastBlock 
  * @param {*} blockType 
  */
-async function fireFullDataRec(lastBlock, blockType, sequence, linkType){
+async function fireFullDataRec(lastBlock, blockType, sequence, linkType) {
   let lastBlockObj;
   console.log("//////////////////////////////////////")
   console.log("FIRING A FULL RECOMMENDATION")
-  if(blockType === "trigger"){
+  if (blockType === "trigger") {
     lastBlockObj = DB.createTriggerFromSingleBlock(lastBlock);
   }
-  else if (blockType === "action"){
+  else if (blockType === "action") {
     lastBlockObj = DB.createActionFromSingleBlock(lastBlock);
   }
   else {
     console.log("WRONG RULE TYPE! rule suggestion not fired")
     return false;
   }
-  let lastBlockElementAtt  = BlockSuggestor.generateElementAttFromRuleElement(lastBlockObj, blockType); 
+  let lastBlockElementAtt = BlockSuggestor.generateElementAttFromRuleElement(lastBlockObj, blockType);
   //call CPT!
-  let CPTpredictions = obtainSequenceRec(sequence, 2, 10);
-  //call NN!
-//Featurs: el_name, el_type, act_type, trigg_type, link_type, negation
-  let NNpredictions = await neuralNetwork.classify(lastBlockElementAtt.elementName, lastBlockElementAtt.elementType, lastBlockElementAtt.actionType, 
-    lastBlockElementAtt.triggerType, lastBlockElementAtt.nextOp, lastBlockElementAtt.negation).then();
-  //neuralNetwork.classify("bathroom-lightLevel", "trigger", "none", "event", "rule", "none"); 
-  //neuralNetwork.classify("bathroom-lightLevel", "trigger", "none", "event" ,"rule", "negation with time");
+  let CPTpredictions = obtainSequenceRec(sequence, RS_values.getPreviousElementToConsider_CPT(), 10);
   let CPTpredictionsCheck = [];
-  if(CPTpredictions[0] && CPTpredictions[0].length > 0) { //horrible error handling
+  if (CPTpredictions[0] && CPTpredictions[0].length > 0) { //horrible error handling
     CPTpredictionsCheck = CPTpredictions[0];
   }
+  //call NN!
+  //Featurs: el_name, el_type, act_type, trigg_type, link_type, negation
+  //let test = await neuralNetworkTest().then();
+  let NNpredictions;
+  try {
+    NNpredictions = await neuralNetwork.classify(lastBlockElementAtt.elementName, lastBlockElementAtt.elementType, lastBlockElementAtt.actionType,
+      lastBlockElementAtt.triggerType, lastBlockElementAtt.nextOp, lastBlockElementAtt.negation).then();
+  }
+  catch {
+    //if(NNpredictions === "error"){
+    if (CPTpredictionsCheck.length > 0) {
+      errorMessages.cleanTextAreaAlerts();
+      clearSuggestionWorkspace();
+      RS_values.setLastRec_CPT(CPTpredictions); //save the last prediciton
+      let onlySequenceElements = mapToOnlyNameArr(CPTpredictions[0]);
+      //let xmlBlocks = DomModifiers.createBlocksFromSuggested(onlySequenceElements); //??
+      DomModifiers.blocksToSuggestionWorkspace(onlySequenceElements);
+      return;
+    }
+    else {
+      errorMessages.suggestorErrorMessages("noSuggestion");
+      return;
+    }
+  }
+  RS_values.setLastRec_NN(NNpredictions);
   let ensembledResults = voteEnsembler(CPTpredictionsCheck, NNpredictions);
   // n of predictions, incompatibleCheck and minConfidence should be controlled via the user interface 
   let predictionToObtain = 5;
-  let minimumConfidence = 0.2;
+  let minimumConfidence = RS_values.getMinimumConfidence_NN();
   let filterIncompatibleCheck = true;
   let top5ensembledResults = obtainTopRec(ensembledResults, predictionToObtain);
   console.log("NN PREDICTIONS:");
@@ -1567,7 +1944,7 @@ async function fireFullDataRec(lastBlock, blockType, sequence, linkType){
   checkIfRuleEnd(filteredRepeated);
   //let xmlBlocks = DomModifiers.createBlocksFromSuggested(onlySequenceElements); //???
   let onlySequenceElements = mapToOnlyNameObj(filteredRepeated);
-  DomModifiers.blocksToSuggestionWorkspace(onlySequenceElements); 
+  DomModifiers.blocksToSuggestionWorkspace(onlySequenceElements);
 }
 
 /**
@@ -1575,9 +1952,9 @@ async function fireFullDataRec(lastBlock, blockType, sequence, linkType){
  * rule element 
  * @param {*} list 
  */
-function checkIfRuleEnd(list){
-  for(let i = 0; i<list.length; i++) {
-    if(list[0].label === "none"){
+function checkIfRuleEnd(list) {
+  for (let i = 0; i < list.length; i++) {
+    if (list[0].label === "none") {
       errorMessages.oftenRuleEnds();
       break;
     }
@@ -1586,11 +1963,30 @@ function checkIfRuleEnd(list){
 }
 
 /**
+ * Test set for NN prediction model
+ */
+async function neuralNetworkTest() {
+  let test1 = ["bathroom-lightLevel", "trigger", "none", "event", "rule", "none"];
+  let test2 = ["bathroom-lightLevel", "trigger", "none", "event", "rule", "negation with time"];
+  let test3 = ["greatLuminaire-temperature", "trigger", "none", "event", "and", "none"];
+  let test4 = ["Bathroom-Relax", "action", "extended", "none", "sequential", "none"];
+  let test5 = ["Bedroom-Relax", "action", "extended", "none", "sequential", "none"];
+  let prediction1 = await neuralNetwork.classify(test1[0], test1[1], test1[2], test1[3], test1[4], test1[5]).then();
+  console.log(prediction1);
+  let prediction2 = await neuralNetwork.classify(test2[0], test2[1], test2[2], test2[3], test2[4], test2[5]).then();
+  console.log(prediction2);
+  let prediction3 = await neuralNetwork.classify(test3[0], test3[1], test1[2], test3[3], test3[4], test3[5]).then();
+  console.log(prediction3);
+  let prediction4 = await neuralNetwork.classify(test4[0], test4[1], test4[2], test4[3], test4[4], test4[5]).then();
+  console.log(prediction4);
+}
+
+/**
  * Remove from suggestions rule objs already in the current sequence
  * @param {*} list 
  * @param {*} previousInsertedSequence 
  */
-function filterRepeated(list, previousInsertedSequence){
+function filterRepeated(list, previousInsertedSequence) {
   let filtered = list.filter((e) => {
     return previousInsertedSequence.includes(e.label) ? false : true;
   });
@@ -1603,11 +1999,23 @@ function filterRepeated(list, previousInsertedSequence){
  * @param {*} list 
  * @param {*} check 
  */
-function filterIncompatible(list, check, linkType){
-  if(!check){
+function filterIncompatible(list, check, linkType) {
+  if (!check) {
     return list;
   }
-  if(linkType === "rule"){
+  if (linkType === "rule") {
+    let filtered = list.filter((e) => {
+      return checkInActionInfoOnlyName(e.label);
+    });
+    return filtered;
+  }
+  else if (linkType === "and" || linkType === "or") {
+    let filtered = list.filter((e) => {
+      return checkInTriggerInfoWithName(e.label);
+    });
+    return filtered;
+  }
+  else if (linkType === "or" || linkType === "and") {
     let filtered = list.filter((e) => {
       return checkInActionInfoOnlyName(e.label);
     });
@@ -1621,7 +2029,7 @@ function filterIncompatible(list, check, linkType){
  * @param {*} list 
  * @param {*} minConf 
  */
-function minimumConfidenceFilter(list, minConf){
+function minimumConfidenceFilter(list, minConf) {
   let copy = list.filter((e) => {
     return e.value > minConf;
   });
@@ -1634,10 +2042,10 @@ function minimumConfidenceFilter(list, minConf){
  * @param {*} resultObj 
  * @param {*} nOfRec 
  */
-function obtainTopRec(resultObj, nOfRec){
+function obtainTopRec(resultObj, nOfRec) {
   console.log(resultObj);
   resultObj.sort((a, b) => {
-      return b.value - a.value;
+    return b.value - a.value;
   });
   let sliced = resultObj.slice(0, nOfRec);
   return sliced;
@@ -1650,16 +2058,16 @@ function obtainTopRec(resultObj, nOfRec){
  * @param {*} CPTweight 
  * @param {*} NNweight 
  */
-function voteEnsembler(CPTpredictions, NNpredictions, CPTweight = 0.5, NNweight = 1){
- let results = []; 
-  for (let el in NNpredictions){
+function voteEnsembler(CPTpredictions, NNpredictions, CPTweight = 0.5, NNweight = 1) {
+  let results = [];
+  for (let el in NNpredictions) {
     let singleResult = {
       label: NNpredictions[el].label,
       value: NNpredictions[el].confidence * NNweight
     }
-    let onlyLabels = CPTpredictions.map(entry => entry[0]); 
+    let onlyLabels = CPTpredictions.map(entry => entry[0]);
     let index = onlyLabels.indexOf(NNpredictions[el].label);
-    if(index !== -1){
+    if (index !== -1) {
       singleResult.value += CPTpredictions[index][1] * CPTweight;
     }
     results.push(singleResult);
@@ -1668,32 +2076,73 @@ function voteEnsembler(CPTpredictions, NNpredictions, CPTweight = 0.5, NNweight 
 }
 
 /**
- * Generate a suggestion with CPT using the last inserted block 
+ * Generate a suggestion with CPT using the block sequence. If no result is 
+ * found, use only the last sequence element. 
  * @param {*} blockSequence 
  */
-function fireOnlySequenceRec(blockSequence, blockType){
+export function fireOnlySequenceRec(blockSequence, blockType, lastBlock) {
   console.log("//////////////////////////////////////")
   console.log("FIRING A SEQUENCE RECOMMENDATION")
-  let predictions = obtainSequenceRec(blockSequence, 2, 5);
-  if(predictions[0] && predictions[0].length > 0) {
+  let predictions = obtainSequenceRec(blockSequence, RS_values.getPreviousElementToConsider_CPT(), 5);
+  if (predictions[0] && predictions[0].length > 0) {
     console.log("SEQUENCE PREDICTIONS:");
     console.log(predictions);
     clearSuggestionWorkspace();
+    errorMessages.cleanTextAreaAlerts();
+    RS_values.setLastRec_CPT(predictions); //save the last prediciton
     let onlySequenceElements = mapToOnlyNameArr(predictions[0]);
     //let xmlBlocks = DomModifiers.createBlocksFromSuggested(onlySequenceElements); //??
     DomModifiers.blocksToSuggestionWorkspace(onlySequenceElements);
+    return;
   }
+  else {
+    let predictions = obtainSequenceRec([lastBlock.type], RS_values.getPreviousElementToConsider_CPT(), 5);
+    if (predictions[0] && predictions[0].length > 0) {
+      console.log("SEQUENCE PREDICTIONS: ONLY LAST ELEMENT");
+      console.log(predictions);
+      clearSuggestionWorkspace();
+      errorMessages.cleanTextAreaAlerts();
+      RS_values.setLastRec_CPT(predictions); //save the last prediciton
+      let onlySequenceElements = mapToOnlyNameArr(predictions[0]);
+      //let xmlBlocks = DomModifiers.createBlocksFromSuggested(onlySequenceElements); //??
+      DomModifiers.blocksToSuggestionWorkspace(onlySequenceElements);
+      return;
+    }
+  }
+  errorMessages.suggestorErrorMessages("noSuggestion");
 }
 
 
-function obtainSequenceRec(blockSequence, lastNElementsToUse, predictionsNumber){
+/**
+ * Generate a suggestion with CPT, do not modify the DOM but returns the result
+ * @param {*} blockSequence 
+ */
+export function fireOnlySequenceRecNoDom(blockSequence, blockType) {
+  console.log("//////////////////////////////////////")
+  console.log("FIRING A SEQUENCE RECOMMENDATION")
+  let elementsToConsider = RS_values.getPreviousElementToConsider_CPT();
+  console.log(elementsToConsider);
+  let predictions = obtainSequenceRec(blockSequence, elementsToConsider, 5);
+  if (predictions[0] && predictions[0].length > 0) {
+    console.log("SEQUENCE PREDICTIONS:");
+    console.log(predictions);
+    let onlySequenceElements = mapToOnlyNameArr(predictions[0]);
+    return {
+      predictions: predictions,
+      onlySequenceElements: onlySequenceElements
+    };
+  }
+}
+
+function obtainSequenceRec(blockSequence, lastNElementsToUse, predictionsNumber) {
   let target = [
     blockSequence
   ];
+  console.log("WILL USE THE LAST ", lastNElementsToUse, " ELEMENTS FOR PREDICTION");
   let predictions = CPTmodel.predict(
     target, // Test input
     lastNElementsToUse, // The number of last elements that will be used
-       // to find similar sequences, (default: target.length)
+    // to find similar sequences, (default: target.length)
     predictionsNumber  // The number of predictions required.
   );
   return predictions
@@ -1703,16 +2152,16 @@ function obtainSequenceRec(blockSequence, lastNElementsToUse, predictionsNumber)
  * 
  * @param {*} predictionsArr 
  */
-function mapToOnlyNameArr(predictionsArr){
-    return predictionsArr.map(entry => entry[0]); 
+function mapToOnlyNameArr(predictionsArr) {
+  return predictionsArr.map(entry => entry[0]);
 }
 
 /**
  * 
  * @param {*} predictionsArr 
  */
-function mapToOnlyNameObj(predictionsArr){
-    return predictionsArr.map(entry => entry.label); 
+function mapToOnlyNameObj(predictionsArr) {
+  return predictionsArr.map(entry => entry.label);
 }
 
 /**
@@ -1888,7 +2337,7 @@ function suggestorDrop() {
     //Blockly.Xml.domToWorkspace(xmlDoc.firstChild, workspace);
   }
   else {
-    document.getElementById('textarea').innerHTML = "No suggestions to drop into main area!";
+    document.getElementById('textarea-alerts').innerHTML = "No suggestions to drop into main area!";
   }
 }
 const exportSuggestorDrop = suggestorDrop;
@@ -1948,6 +2397,35 @@ export function exportWorkspace() {
 /**
  * 
  */
+export async function exportAllRules() {
+  "use strict";
+  let user = getUserName();
+  let allRulesForAnUser = await DB.getAllFromDBUserFullData(user).then();
+  let pretty = "";
+  allRulesForAnUser.forEach( (e) => {
+    pretty += e.rule_obj_str;
+    pretty += "\n\n\n\n";
+  });
+  let blob = new Blob([pretty], { type: "text/plain;charset=utf-8" });
+  saveAs(blob, "myRules.txt");
+}
+/**
+ * 
+ */
+export function newRule() {
+  let workspace = getWorkspace();
+  workspace.clear();
+  let secondaryWorkspace = getSuggestionWorkspace();
+  secondaryWorkspace.clear();
+  DomModifiers.addRuleBlockToWorkspace(workspace);
+  resetRuleSequence();
+  resetLastBlock();
+  errorMessages.startTriggerEditing();
+}
+
+/**
+ * 
+ */
 export function extractChildRecursive(block) {
   "use strict";
   if (block.isTrigger || block.isTriggerArray || block.isAction) {
@@ -1963,7 +2441,7 @@ export function extractChildRecursive(block) {
 /**
  * Helper function
  */
-export function getRuleBlocksArr(){
+export function getRuleBlocksArr() {
   "use strict";
   return ruleBlocksArr;
 }
@@ -1971,9 +2449,9 @@ export function getRuleBlocksArr(){
 /**
  * 
  */
-export function cleanRuleBlocksArr(){
+export function cleanRuleBlocksArr() {
   "use strict";
-  ruleBlocksArr = []; 
+  ruleBlocksArr = [];
 }
 
 /**
@@ -2008,7 +2486,7 @@ export function getTriggerCategory(triggerName) {
     return e.fullName === triggerName;
   });
   let myCategory;
-  if (myData && myData.categoryName){
+  if (myData && myData.categoryName) {
     myCategory = myData.categoryName;
   }
   return myCategory;
@@ -2143,7 +2621,7 @@ export function eventSelectedAppendField(blockId) {
   let block = myWorkspace.blockDB_[blockId];
   block.triggerType = "event";
   block.getInput("TRIGGER_TYPE").appendField("when event")
-    .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/event.jpeg", 25, 25, "*"));
+    .appendField(new Blockly.FieldImage("../src/img/event.jpeg", 25, 25, "*"));
   block.appendDummyInput("EVENT")
     .setVisible(false);
   //block.getInput("BLOCK_HEADER").appendField("EVENT").setVisible(false);
@@ -2160,7 +2638,7 @@ export function conditionSelectedAppendField(blockId) {
   let block = myWorkspace.blockDB_[blockId];
   block.triggerType = "condition";
   block.getInput("TRIGGER_TYPE").appendField("if condition")
-    .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/condition.jpeg", 25, 25, "*"));
+    .appendField(new Blockly.FieldImage("../src/img/condition.jpeg", 25, 25, "*"));
   block.appendDummyInput("CONDITION")
     .setVisible(false);
   //block.getInput("BLOCK_HEADER").appendField("CONDITION").setVisible(false);
@@ -2689,7 +3167,7 @@ function checkActionSequence() {
  * Controlla se il trigger passato è presente nel db dei trigger
  * @param {*} trigger 
  */
- export function checkInTriggerInfo(trigger) {
+export function checkInTriggerInfo(trigger) {
   const triggerInfo = getTriggerInfo();
   let found = false;
   triggerInfo.forEach(function (e) {
@@ -2700,11 +3178,11 @@ function checkActionSequence() {
   return found;
 }
 
-function getTriggerOps(){
+function getTriggerOps() {
   return triggerOperators;
 }
 
-function getActionOps(){
+function getActionOps() {
   return actionOperators;
 }
 
@@ -2713,7 +3191,7 @@ function getActionOps(){
  * Controlla se il trigger passato è presente nel db dei trigger
  * @param {*} trigger 
  */
- export function checkInTriggerInfoWithName(trigger) {
+export function checkInTriggerInfoWithName(trigger) {
   const triggerInfo = getTriggerInfo();
   let found = false;
   triggerInfo.forEach(function (e) {
@@ -2916,7 +3394,7 @@ export function createRuleBlocksObj() {
     triggers: [],
     triggers_op: [],
     actions: [],
-    actions_op:[],
+    actions_op: [],
     triggersRealName: [],
     actionsRealName: []
   };
@@ -2925,14 +3403,14 @@ export function createRuleBlocksObj() {
       resultObj.triggers.push(blocksInRule[i].name);
       resultObj.triggersRealName.push(blocksInRule[i].type);
     }
-    else if (checkInTriggerOperators(blocksInRule[i])){
+    else if (checkInTriggerOperators(blocksInRule[i])) {
       resultObj.triggers_op.push(blocksInRule[i].type);
     }
     else if (checkInActionInfo(blocksInRule[i])) {
       resultObj.actions.push(blocksInRule[i].name);
       resultObj.actionsRealName.push(blocksInRule[i].type);
     }
-    else if (checkInActionOperators(blocksInRule[i])){
+    else if (checkInActionOperators(blocksInRule[i])) {
       resultObj.actions_op.push(blocksInRule[i].type);
     }
   }
@@ -2972,7 +3450,8 @@ export function actionStrToObj(rule) {
   return rule;
 }
 
-/**
+/** //TODO: currentUser non viene più usato, si lavora solo con lo storage
+ *  tutte queste funzioni sono duplicate di login e da rimuovere
  * Controlla se è settato un user nel local storage, se lo è salva nell'user
  * corrente e mostra il nome
  */
@@ -2980,8 +3459,8 @@ function localStorageChecker() {
   let user = window.localStorage.getItem('user');
   if (user) {
     currentUser = user;
-    document.getElementById('user-name').innerHTML = "Logged as: " + currentUser;
-    document.getElementById('input-username').value = currentUser;
+//    document.getElementById('user-name').innerHTML = "Logged as: " + currentUser;
+//    document.getElementById('input-username').value = currentUser;
   }
 }
 
@@ -2995,6 +3474,13 @@ export function saveUserToLocal(userName) {
 }
 
 /**
+ * 
+ */
+export function removeUserFromLocal(){
+  localStorage.removeItem("user"); 
+}
+
+/**
  * Restituisce l'user name attualmente salvato nel localstorage
  */
 export function getUserName() {
@@ -3004,60 +3490,63 @@ export function getUserName() {
 /**
  * Helper function
  */
-export function setLastBlock(block){
+export function setLastBlock(block) {
   lastBlock = block;
 }
 
 /**
  * Helper function
  */
-export function getLastBlock(){
+export function getLastBlock() {
   return lastBlock;
 }
 
 /**
  * Helper function
  */
-export function setLastBlocklyEvent(event){
+export function setLastBlocklyEvent(event) {
   lastBlocklyEvent = event;
 }
 
 /**
  * Helper function
  */
-export function getLastBlocklyEvent(){
+export function getLastBlocklyEvent() {
   return lastBlocklyEvent;
 }
 
 /**
  * Helper function
  */
-export function getRevertPossibility(){
+export function getRevertPossibility() {
   return revertPossibility;
 }
 
 /**
  * Helper function
  */
-export function setRevertPossibility(val){
+export function setRevertPossibility(val) {
   revertPossibility = val;
 }
 
 /**
  * Helper function: clears the secondary workspace
- */ 
-export function clearSuggestionWorkspace(){
+ */
+export function clearSuggestionWorkspace() {
   let secondWorkspace = getSuggestionWorkspace();
   let allSuggestedBlocks = secondWorkspace.getAllBlocks(false);
-  allSuggestedBlocks.forEach( e => e.dispose());
+  allSuggestedBlocks.forEach(e => e.dispose());
 }
 
-export function blockToDom(xml){
-  return(Blockly.Xml.blockToDom(xml));
+export function blockToDom(xml) {
+  return (Blockly.Xml.blockToDom(xml));
 }
 
-
-function convertElementAttInArr(allElementAtt){
+/**
+ * 
+ * @param {*} allElementAtt 
+ */
+function convertElementAttInArr(allElementAtt) {
   let arrayed = [];
   allElementAtt.forEach(el => {
     let row = [];
@@ -3072,3 +3561,109 @@ function convertElementAttInArr(allElementAtt){
   })
   return arrayed;
 };
+
+/**
+ * setter 
+ */
+export function changeRecommendationType() {
+  if (recommendationType === "Step by step recommendations") {
+    recommendationType = "Full rule recommendations";
+  }
+  else {
+    recommendationType = "Step by step recommendations";
+  }
+  console.log(recommendationType);
+}
+
+/**
+ * setter 
+ */
+export function setRecommendationType(type) {
+  if (type === "step") {
+
+    recommendationType = "Step by step recommendations";
+  }
+  else if (type === "full") {
+    recommendationType = "Full rule recommendations";
+  }
+  else {
+    recommendationType = "None";
+  }
+  suggestorTypeChanged();
+  console.log(recommendationType);
+}
+
+
+
+/**
+ * Start the various behaviours that occurs when the recommendation type 
+ * is changed: change the recType var, change the texts, call a new rec. 
+ */
+function suggestorTypeChanged() {
+  errorMessages.changeRecTypeDiv();
+  let lastBlock = getLastBlock();
+  if (lastBlock) {
+    let nextBlock = lastBlock.getNextBlock();
+    //attach a trigger/action to the trigger/action operator of the prev block
+    if (nextBlock === null) {
+      ruleSuggestorManager();
+    }
+    else {
+      ruleSuggestorManager(lastBlock, true, nextBlock.blockType);
+    }
+  }
+}
+
+
+
+/**
+* getter
+*/
+export function getRecType() {
+  return recommendationType;
+}
+
+/**
+ * 
+ * @param {*} parent 
+ */
+export function removeToInputsFromEventTime(parent) {
+  let inputHour = parent.getInput("END_TIME_HOUR");
+  if (inputHour) {
+    inputHour.dispose();
+  }
+  let inputMin = parent.getInput("END_TIME_MIN");
+  if (inputMin) {
+    inputMin.dispose();
+  }
+  let inputLabelEnd = parent.getInput("END_TIME_LABEL");
+  if (inputLabelEnd) {
+    inputLabelEnd.dispose();
+  }
+  let inputLabelStart = parent.getInput("START_TIME_LABEL");
+  if (inputLabelStart) {
+    inputLabelStart.dispose();
+  }
+
+  parent.appendDummyInput("dummy");
+  parent.removeInput("dummy"); //force block reload
+}
+
+
+/**
+ * 
+ */
+export function removeUnusedInputsFromSecondaryWorkspace() {
+  "use strict";
+  let workspace = getSuggestionWorkspace();
+  let blocks = workspace.getAllBlocks();
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].type === "event") {
+      let parent = blocks[i].getParent();
+      if (parent && parent.name === "Time") {
+        removeToInputsFromEventTime(parent);
+      }
+    }
+  }
+  //DomModifiers.alignBlocks();
+}

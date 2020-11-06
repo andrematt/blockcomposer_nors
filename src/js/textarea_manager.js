@@ -1,25 +1,38 @@
-import {startRefineRule} from "./main.js";
+import {startRefineRule, getRecType} from "./main.js";
 
 /**
- * 
+ *  Change the type of recommendation
  */
-export function clearSuggestorTextarea(){
-    document.getElementById('textarea-suggestor').innerHTML = "";
+export function changeRecTypeDiv(){
+    let recType = getRecType();
+    document.getElementById('rec-type-text-div').innerHTML = "";
+    if(recType === "Full rule recommendations"){
+        document.getElementById('rec-type-text-div').innerHTML = "Suggestion type: Full rule";
+    }
+    else if(recType === "Step by step recommendations"){
+        document.getElementById('rec-type-text-div').innerHTML = "Suggestion type: Step-by-step";
+    }
+    else {
+        document.getElementById('rec-type-text-div').innerHTML = "Suggestions disabled";
+    }
 }
+
 
 /**
  * 
  */
 export function afterTriggerMessage(){
- let text =  `
- Click on <e class="link-textarea" id="textarea-and">And</e>, <e class="link-textarea" id="textarea-or">Or</e>, <e class="link-textarea" id="textarea-not">Not</e> or <e class="link-textarea" id="textarea-rule">Action</e> tfor a more refined suggestion about the next block.
-    `;
-    document.getElementById('textarea-suggestor').innerHTML = "";
-    document.getElementById('textarea-suggestor').innerHTML = text;
-    document.getElementById("textarea-and").onclick = function () { startRefineRule("and") };
-    document.getElementById("textarea-or").onclick = function () { startRefineRule("or") };
-    document.getElementById("textarea-not").onclick = function () { startRefineRule("not") };
-    document.getElementById("textarea-rule").onclick = function () { startRefineRule("rule") };
+    document.getElementById("suggestor-and").removeAttribute("disabled"); 
+    document.getElementById("suggestor-or").removeAttribute("disabled"); 
+    document.getElementById("suggestor-not").removeAttribute("disabled"); 
+    document.getElementById("suggestor-action").removeAttribute("disabled"); 
+    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-parallel").setAttribute("disabled", ""); 
+     let text = `
+     Click on "AND", OR", "NOT" or "ACTION" to add the operator (if needed) and obtain more precise suggestions
+ `;
+    document.getElementById('textarea-suggestion-expl').innerHTML = "";
+    document.getElementById('textarea-suggestion-expl').innerHTML = text;
 }
 
 
@@ -28,26 +41,35 @@ export function afterTriggerMessage(){
  * 
  */
 export function afterTriggerOpMessage(){
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-action").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-parallel").setAttribute("disabled", ""); 
+ 
  let text =  `
  Continue the editing of the trigger part selecting another trigger from the toolbox or clicking on a suggested trigger.
     `;
-    document.getElementById('textarea-suggestor').innerHTML = "";
-    document.getElementById('textarea-suggestor').innerHTML = text;
+    document.getElementById('textarea-suggestion-expl').innerHTML = "";
+    document.getElementById('textarea-suggestion-expl').innerHTML = text;
 }
 
 /**
  * 
  */
 export function afterNotMessage(){
-  console.log("afternotmessage");
- let text =  `
- Click on <e class="link-textarea" id="textarea-and">And</e>, <e class="link-textarea" id="textarea-or">Or</e>, or <e class="link-textarea" id="textarea-rule">Action</e> for a more refined suggestion about the next block. 
-    `;
-    document.getElementById('textarea-suggestor').innerHTML = "";
-    document.getElementById('textarea-suggestor').innerHTML = text;
-    document.getElementById("textarea-and").onclick = function () { startRefineRule("and") };
-    document.getElementById("textarea-or").onclick = function () { startRefineRule("or") };
-    document.getElementById("textarea-rule").onclick = function () { startRefineRule("rule") };
+    document.getElementById("suggestor-and").removeAttribute("disabled"); 
+    document.getElementById("suggestor-or").removeAttribute("disabled"); 
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-action").removeAttribute("disabled"); 
+    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-parallel").setAttribute("disabled", ""); 
+     let text = `
+     Click on "AND", OR" or "ACTION" to add the operator (if needed) and obtain more precise suggestions
+ `;
+    document.getElementById('textarea-suggestion-expl').innerHTML = "";
+    document.getElementById('textarea-suggestion-expl').innerHTML = text;
 }
 
 /**
@@ -57,33 +79,42 @@ export function oftenRuleEnds(){
  let text = `
  Often rules ends with this element. 
  `;
-    document.getElementById('textarea-suggestor').innerHTML = "";
-    document.getElementById('textarea-suggestor').innerHTML = text;
+    document.getElementById('textarea-alerts').innerHTML = "";
+    document.getElementById('textarea-alerts').innerHTML = text;
 }
 
 /**
  * 
  */
 export function afterActionMessage(){
- let text = `
- Click on <e class="link-textarea" id="textarea-sequential">Sequential</e>, <e class="link-textarea" id="textarea-parallel">Parallel</e> for a more refined suggestion about the next block.
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-action").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-sequential").removeAttribute("disabled"); 
+    document.getElementById("suggestor-parallel").removeAttribute("disabled"); 
+     let text = `
+     Click on "SEQUENTIAL" or "PARALLEL" to add the operator and obtain more precise suggestions
  `;
-    document.getElementById('textarea-suggestor').innerHTML = "";
-    document.getElementById('textarea-suggestor').innerHTML = text;
-    document.getElementById("textarea-sequential").onclick = function () { startRefineRule("sequential") };
-    document.getElementById("textarea-parallel").onclick = function () { startRefineRule("parallel") };
-    //document.getElementById("textarea-end").onclick = function () { startRefineRule("end") };
+    document.getElementById('textarea-suggestion-expl').innerHTML = "";
+    document.getElementById('textarea-suggestion-expl').innerHTML = text;
 }
 
 /**
  * 
  */
 export function afterActionOpMessage(){
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-action").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-parallel").setAttribute("disabled", "");
  let text =  `
  Continue the editing of the action part selecting another action from the toolbox or clicking on a suggested action.
-    `;
-    document.getElementById('textarea-suggestor').innerHTML = "";
-    document.getElementById('textarea-suggestor').innerHTML = text;
+    `;    
+    document.getElementById('textarea-suggestion-expl').innerHTML = "";
+    document.getElementById('textarea-suggestion-expl').innerHTML = text;
 }
 
 
@@ -94,9 +125,33 @@ export function startActionEditing(){
  let text =  `
  Start the editing of the action part selecting an action from the toolbox or clicking on a suggested action.
     `;
-    document.getElementById('textarea-suggestor').innerHTML = "";
-    document.getElementById('textarea-suggestor').innerHTML = text;
+    document.getElementById('textarea-suggestion-expl').innerHTML = "";
+    document.getElementById('textarea-suggestion-expl').innerHTML = text;
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-action").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-parallel").setAttribute("disabled", "");
 }
+
+/**
+ * 
+ */
+export function startTriggerEditing(){
+ let text =  `
+ Start the editing of the trigger part selecting a trigger from the toolbox.
+    `;
+    document.getElementById('textarea-suggestion-expl').innerHTML = "";
+    document.getElementById('textarea-suggestion-expl').innerHTML = text;
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-action").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-parallel").setAttribute("disabled", "");
+}
+
 
 
 /**
@@ -107,28 +162,28 @@ export function suggestorErrorMessages(errorType) {
   "use strict";
     if (errorType === "noElements"){
     let text = "Can't generate suggestion: need at least 1 rule element inserted into the 'rule' block!"; 
-    document.getElementById('textarea-2').innerHTML = "";
-    document.getElementById('textarea-2').innerHTML = text;
+    document.getElementById('textarea-alerts').innerHTML = "";
+    document.getElementById('textarea-alerts').innerHTML = text;
   }
   if (errorType === "noFirstTrigger") {
     let text = "Could not create suggestion for this block type. Suggestions will be created if the first element in the 'trigger' section of 'rule' block is a trigger.";
-    document.getElementById('textarea-2').innerHTML = "";
-    document.getElementById('textarea-2').innerHTML = text;
+    document.getElementById('textarea-alerts').innerHTML = "";
+    document.getElementById('textarea-alerts').innerHTML = text;
   }
   else if (errorType === "noRulesWithTrigger") {
     let text = "Not enough rules were found for this trigger.";
-    document.getElementById('textarea-2').innerHTML = "";
-    document.getElementById('textarea-2').innerHTML = text;
+    document.getElementById('textarea-alerts').innerHTML = "";
+    document.getElementById('textarea-alerts').innerHTML = text;
   }
   else if (errorType === "noSuggestion") {
-    let text = "No suggestions were found for this trigger.";
-    document.getElementById('textarea-2').innerHTML = "";
-    document.getElementById('textarea-2').innerHTML = text;
+    let text = "No suggestions were found for this block.";
+    document.getElementById('textarea-alerts').innerHTML = "";
+    document.getElementById('textarea-alerts').innerHTML = text;
   }
   else if (errorType === "noActionSuggestion") {
     let text = "No actions to suggest for these triggers";
-    document.getElementById('textarea-2').innerHTML = "";
-    document.getElementById('textarea-2').innerHTML = text;
+    document.getElementById('textarea-alerts').innerHTML = "";
+    document.getElementById('textarea-alerts').innerHTML = text;
   }
 }
 
@@ -137,18 +192,17 @@ export function suggestorErrorMessages(errorType) {
 export function printError(child, parent){
     "use strict";
     //console.log(child);
-    let message = " Warning: Default error message";
+    let message = " Warning: incorrect blocks placing";
     if(child.isTrigger && parent.type==="rule"){
         message = " Warning: trigger blocks must be placed in the Trigger section of the rule block!";
     }
     else if(child.isAction && parent.type==="rule"){
         message = " Warning: action blocks must be placed in the Action section of the rule block!";
     }
-    document.getElementById('textarea-2').innerHTML = `
-        <p style="warning-message"><i class="fas fa-exclamation-triangle"></i>${message}</p> 
+    document.getElementById('textarea-alerts').innerHTML = `
+        <i class="fas fa-exclamation-triangle"></i>${message}
     `
     ;
-    //ocument.getElementById('textarea-2').innerHTML = message;
 }
 
 export function printPassedError(error){
@@ -170,16 +224,25 @@ export function printPassedError(error){
         default:
             message = "default error message";
     }
-    document.getElementById('textarea-2').innerHTML = `
-    <p style="warning-message"><i class="fas fa-exclamation-triangle"></i>${message}</p> 
+    document.getElementById('textarea-alerts').innerHTML = `
+    <p class="warning-message"><i class="fas fa-exclamation-triangle"></i>${message}</p> 
     `
     ;
 }
 
-export function cleanError(){
+export function cleanTextAreaChecks(){
     "use strict";
-    document.getElementById('textarea-2').innerHTML = "";
+    document.getElementById('textarea-connections-check').innerHTML = "";
 }
 
 
+export function cleanTextAreaAlerts(){
+    "use strict";
+    document.getElementById('textarea-alerts').innerHTML = "";
+}
 
+
+export function cleanTextAreaExplainations(){
+    "use strict";
+    document.getElementById('textarea-suggestion-expl').innerHTML = "";
+}

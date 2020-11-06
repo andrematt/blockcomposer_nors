@@ -1,12 +1,19 @@
-import { getAllFromDB, getOneFromDB } from "./database_functs.js";
+import { getAllFromDB, getAllFromDBUser} from "./database_functs.js";
 import { forceWorkspaceReload } from "./extensions.js";
+import { checkConnection } from "./connections_checks.js";
 import {
   actionStrToObj, getWorkspace, getSuggestionWorkspace, getHighlightedRule, 
   removeUnusedParallel, getRuleBlock, blockToDom, checkInActionInfoOnlyName,
-  checkInTriggerInfoWithName
+  checkInTriggerInfoWithName, clearSuggestionWorkspace, getLastBlock, 
+  getRecType
 }
   from "./main.js";
+import {getUserName} from "./login.js";
 
+///////////////////////////// dom_modifiers ////////////////////////////////////
+/* contains all the functions to add/remove/modifiy the blocks in the 
+ *  workspaces.
+*/
 
 /**
  * Updates the block and the XML of a trigger, when the negation is added via 
@@ -49,11 +56,44 @@ export function moveSingleBlockToMain(block){
   let suggestedBlock = firstWorkspace.newBlock(block.type);
   suggestedBlock.initSvg();
   suggestedBlock.render();
-  block.dispose();
+  connectToPreviousBlock(suggestedBlock);
+  //block.dispose();
   //let xml_str = rule[0].rule_xml_str;
     //let xmlDoc = new DOMParser().parseFromString(xml_str, "text/xml");
     //console.log(xmlDoc);
     //Blockly.Xml.domToWorkspace(xmlDoc.firstChild, workspace);
+  }
+
+  /**
+   * Automatically add a single block clicked on the secondary WS to the 
+   * correct previous block.
+   * @param {*} suggestedBlock 
+   */
+  //simile a addOperatorToBlock
+  function connectToPreviousBlock(suggestedBlock){
+    let lastBlock = getLastBlock();
+    console.log(lastBlock);
+    let nextBlock = lastBlock.getNextBlock();
+    console.log(nextBlock);
+    //attach a trigger/action to the trigger/action operator of the prev block
+    if(nextBlock !== null){
+      let check = checkConnection(suggestedBlock, nextBlock);
+      console.log(check);
+      if(check){
+        let blockConnection = nextBlock.nextConnection;
+        let otherConnection = suggestedBlock.previousConnection;
+        blockConnection.connect(otherConnection);
+      }
+    }
+    //if last block is trigger and actual is action, attach to the "rule" 
+    //block "action" connection
+    else if(lastBlock.blockType==="trigger" && suggestedBlock.blockType==="action"){
+      let ruleBlock=getRuleBlock();
+      let ruleBlockConnection = ruleBlock.getInput("ACTIONS").connection;
+      let actionConnection = suggestedBlock.previousConnection;
+      ruleBlockConnection.connect(actionConnection);
+    }
+    return;
   }
 
   /**
@@ -129,7 +169,8 @@ export function removeActionRevert() {
  */
 export async function appendRulesList(domElement) {
   "use strict";
-  let rules = await getAllFromDB().then();
+  let user = getUserName();
+  let rules = await getAllFromDBUser(user).then();
   console.log(rules);
   if (rules && rules.length > 0) {
     //rimuove i nodi precedenti
@@ -338,6 +379,7 @@ export function createBlocksFromSuggested(suggestions) {
 export function blocksToSuggestionWorkspace(blocks) {
   "use strict";
   console.log(blocks);
+  clearSuggestionWorkspace();
     const workspace = getSuggestionWorkspace();
     for (let i = 0; i < blocks.length; i++) {
       if(checkInActionInfoOnlyName(blocks[i]) || checkInTriggerInfoWithName(blocks[i])){
@@ -351,11 +393,76 @@ export function blocksToSuggestionWorkspace(blocks) {
   alignBlocks();
 }
 
+/**
+ * Adds a new Rule block to the passed workspace
+ * @param {*} workspace 
+ */
+export function addRuleBlockToWorkspace(workspace){
+  let block = workspace.newBlock("rule");
+  block.initSvg();
+  block.render();
+}
+
+/**
+ * 
+ * @param {*} blocks 
+ */
+export function rulesToSuggestionWorkspace(rules) {
+  "use strict";
+  console.log(rules);
+  clearSuggestionWorkspace();
+    const workspace = getSuggestionWorkspace();
+    for (let i = 0; i < rules.length; i++) {
+       let xml_str = rules[i][0].rule_xml_str;
+       let xmlDoc = new DOMParser().parseFromString(xml_str, "text/xml");
+       //console.log(xmlDoc);
+        Blockly.Xml.domToWorkspace(xmlDoc.firstChild, workspace);
+      }
+  alignBlocks();
+}
 
 /**
  * 
  */
-function alignBlocks(){
+export function alignBlocks(){
+  let recType = getRecType();
+  if(recType==="Full rule recommendations"){
+    let allBlocks = getSuggestionWorkspace().getAllBlocks();
+    console.log(allBlocks);
+    let allRuleBlocks = allBlocks.filter( (e) => {
+      return e.type ==="rule";
+    });
+    if(allRuleBlocks.length > 0){
+    let cumulativeBlocksHeight = 0;
+    let buffer = 20;
+    let firstBlockX = allRuleBlocks[0].getRelativeToSurfaceXY().x;
+    let firstBlockY = allRuleBlocks[0].getRelativeToSurfaceXY().y;
+    for (let i = 0; i< allRuleBlocks.length; i++){
+      let myX = allRuleBlocks[i].getRelativeToSurfaceXY().x;
+      let myY = allRuleBlocks[i].getRelativeToSurfaceXY().y;
+      console.log(myX);
+      let diffX = firstBlockX - myX;
+      let moveX = 0;
+      if(firstBlockX > myX) {
+        moveX = diffX;
+      }
+      else if(firstBlockX < myX){
+        moveX = diffX;
+      }
+      let diffY = firstBlockY - myY;
+      let moveY = cumulativeBlocksHeight;
+      if(firstBlockY > myY) {
+        moveY += diffY;
+      }
+      else if(firstBlockX < myX){
+        moveY += -diffY;
+      }
+    allRuleBlocks[i].moveBy(moveX, moveY);
+    cumulativeBlocksHeight += allRuleBlocks[i].getHeightWidth().height + (buffer * i+1);
+    }   
+  }
+  }
+  else {
   var blocks = getSuggestionWorkspace().getTopBlocks()
   var y = 0
   for (var i = 0; i < blocks.length; i++){
@@ -363,4 +470,5 @@ function alignBlocks(){
     y += blocks[i].getHeightWidth().height
     y += 10 //buffer
   }
+}
 }

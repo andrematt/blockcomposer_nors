@@ -1,14 +1,32 @@
-let loggedUser = "";
 
-export function getLoggedUser(){
-  console.log("logged user: ", loggedUser);
-  return loggedUser;
+/**
+ * Salve l'user name nel local storage
+ * @param {*} userName 
+ */
+export function saveUserToLocal(userName) {
+  window.localStorage.setItem('user', userName);
 }
 
-export function setLoggedUser(user){
-  loggedUser = user;
+/**
+ * 
+ */
+export function removeUserFromLocal(){
+  localStorage.removeItem("user"); 
 }
 
+/**
+ * Restituisce l'user name attualmente salvato nel localstorage
+ */
+export function getUserName() {
+  let user = window.localStorage.getItem('user');
+  if (user) {
+    return(user);
+  }
+}
+
+/*
+ * allow the click on the login button
+*/
 export function modifyUiLogin(userObj){
   const el = document.getElementById("user-content");
   const signOutUser = "Log out " + userObj.ofa;
@@ -18,41 +36,45 @@ export function modifyUiLogin(userObj){
 //el.classList.remove("hidden");
 }
 
-export function modifyUiLogout(){
-  const el = document.getElementById("user-content");
-  $('#user-content').attr("hidden", true);
-  $('#google-signout').attr("hidden", true);
-  //el.classList.add("hidden");
+/**
+ * 
+ */
+export function loadEditor(){
+  onclick="location.href='https://localhost:8080/editor.html';"
 
 }
+
 
 export function checkLogin(){
-  gapi.auth2.getAuthInstance().then(
-    function (success) {
-      console.log(success);
-      setLoggedUser(success.currentUser.Ab.w3.U3);
-      modifyUiLogin(success.currentUser.Ab.w3);
-    },
-    function (error) {
-      // Error occurred
-      console.log(error);
+ let user = getUserName(); 
+    if (user) {
+      //$("#clickable-login").removeClass('disabled');
+      //$("#clickable-logout").removeClass('disabled');
+      document.getElementById("clickable-login").removeAttribute("disabled"); 
+      document.getElementById("clickable-logout").removeAttribute("disabled"); 
+    } 
+    else {
+      //$("#clickable-login").addClass('disabled');
+      //$("#clickable-logout").addClass('disabled');
+      document.getElementById("clickable-login").setAttribute("disabled", ""); 
+      document.getElementById("clickable-logout").setAttribute("disabled", ""); 
     }
-  );
 }
-
 
 /** 
  * 
  */
-export function login() {
-  console.log("chiamo login");
+export async function login() {
   gapi.auth2.getAuthInstance().signIn().then(
     function (success) {
-      console.log(success);
-      let email = success.w3.U3;
-      console.log(email);
-      loggedUser = email;
-      modifyUiLogin(success.w3);
+      //console.log(success);
+      //console.log("User signed in.");
+      let user = {
+        mail: success.tt.$t,
+        name: success.tt.Ad
+      }
+      saveUserToLocal(user.mail);
+      checkLogin();
     },
     function (error) {
       // Error occurred
@@ -68,15 +90,9 @@ export function login() {
 export function logout() {
   var auth2 = gapi.auth2.getAuthInstance();
   auth2.signOut().then(function () {
-    console.log('User signed out.');
-    modifyUiLogout();
-    document.getElementById("google-signin").style.display = "block";
-   
-    /*
-    document.getElementsByClassName("userContent")[0].innerHTML = '';
-    document.getElementsByClassName("userContent")[0].style.display = "none";
-    
-    */
+    //console.log('User signed out.');
+    removeUserFromLocal();
+    checkLogin();
   });
   auth2.disconnect();
 }

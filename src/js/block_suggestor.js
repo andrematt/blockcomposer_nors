@@ -5,6 +5,9 @@ import {
 import { ruleBlockChangesListener } from "./listeners.js";
 import {dimensionIdTranslator} from "./utils.js"
 
+//////////////////// Most of these functions are no more used, because the recommendations
+//////////////////// are now generated using external libraries (CPT, ML5).
+//////////////////// TODO: check what can be safely deleted from this file. 
 
 /**
  * Genera suggerimenti a partire dai vari graphs delle regole che iniziano per

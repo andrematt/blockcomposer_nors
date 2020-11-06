@@ -1,0 +1,301 @@
+@import url("https://fonts.googleapis.com/css?family=Fira+Sans:300");
+
+body {
+  font-family: "Fira Sans", sans-serif;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #222;
+}
+
+#user-name {
+  font-family: "Fira Sans", sans-serif;
+  font-weight: 800;
+  line-height: 1.9;
+  color: #222;
+}
+
+.block-name {
+  font-weight: bold;
+}
+
+.link-textarea {
+  color: blue;
+  cursor: pointer;
+}
+
+.link-textarea:hover {
+  text-decoration: underline;
+}
+
+/* Rule list table TODO: guarda come si comporta quando ci sono tante regole */
+.rule-list-container{
+  display: inline-block;
+  height: 50vh;
+  overflow: auto;
+  width:80%;
+}
+
+
+
+label {
+  /* To make sure that all labels have the same size and are properly aligned */
+  display: inline-block;
+  width: 90px;
+  text-align: right;
+}
+
+.highlight {
+  background-color: #99dcd8;
+}
+
+form {
+  text-align: center;
+}
+
+.modal {
+  display: none;
+}
+
+.modal.is-open {
+  display: block;
+}
+
+.modal__container {
+  z-index: 9999999;
+  max-width: 1024px;
+}
+
+#modal-2 {
+  .modal__container {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100%;
+  }
+}
+
+#modal-3 {
+  .modal__container {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100%;
+  }
+}
+
+/* Modal window for the event/condition selection */
+.grid-container-event-condition {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 2.5fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 15px 15px;
+  grid-template-areas:
+    "event-icon event-desc event-examples event-button"
+    "condition-icon condition-desc condition-examples condition-button";
+  .event-icon {
+    grid-area: event-icon;
+    display: flex;
+    p {
+      margin: auto;
+    }
+  }
+  .event-desc {
+    grid-area: event-desc;
+    display: flex;
+    p {
+      margin: auto;
+    }
+  }
+  .event-examples {
+    grid-area: event-examples;
+    display: flex;
+    p {
+      margin: auto;
+    }
+  }
+
+  .event-button {
+    grid-area: event-button;
+    display: flex;
+    p {
+      margin: auto;
+    }
+  }
+
+  .condition-icon {
+    grid-area: condition-icon;
+    display: flex;
+    p {
+      margin: auto;
+    }
+  }
+
+  .condition-desc {
+    grid-area: condition-desc;
+    display: flex;
+    p {
+      margin: auto;
+    }
+  }
+
+  .condition-examples {
+    grid-area: condition-examples;
+    display: flex;
+    p {
+      margin: auto;
+    }
+  }
+
+  .condition-button {
+    grid-area: condition-button;
+    display: flex;
+    p {
+      margin: auto;
+    }
+  }
+}
+
+// altrimenti alcune parti del workspace si sovrappongono alle finestre modali
+#main-workspace-div {
+  z-index: 0;
+}
+#suggestion-workspace-div {
+  z-index: 0;
+}
+
+input {
+  /* To make sure that all text fields have the same font settings
+       By default, textareas have a monospace font */
+  font: 1em sans-serif;
+
+  /* To give the same size to all text fields */
+  width: 300px;
+  box-sizing: border-box;
+
+  /* To harmonize the look & feel of text field border */
+  border: 1px solid #999;
+}
+
+input:focus {
+  /* To give a little highlight on active elements */
+  border-color: #000;
+}
+
+.header {
+  .toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-image: linear-gradient(to right, lightseagreen, blue);
+    .site-title-container {
+      margin-left: 10px;
+    }
+    .utility-buttons-container {
+      display: flex;
+      .user-content {
+        margin-right: 10px;
+      }
+      .login-logout-container {
+        margin-right: 10px;
+      }
+    }
+  }
+}
+
+.workspaces-container {
+  display: flex;
+  flex-direction: row;
+  border-style: solid;
+  height: 73vh;
+  #main-workspace-div {
+    width: 75%; /* Or whatever */
+    height: 100%; /* Or whatever */
+    margin: 0; /* Magic! */
+    padding: 0;
+  }
+  #suggestion-workspace-div {
+    width: 25%; /* Or whatever */
+    height: 100%; /* Or whatever */
+    margin: 0; /* Magic! */
+    padding: 0;
+  }
+}
+
+.support-container {
+  display: flex;
+  height: 12vh;
+  //margin-bottom:1vh;
+  //margin-top:1vh;
+  .textarea-container {
+    width: 75%;
+    height: 100%;
+    .textarea-div {
+      width: 100%;
+      #textarea-suggestor {
+        display: flex;
+        align-items: center;
+        width: 50%;
+        margin: auto;
+        min-height: 5vh;
+        font-size: 1.2em;
+        button {
+          margin: auto;
+        }
+      }
+      #textarea-suggestion-expl {
+        font-size:1.1em;
+        width: 90%;
+        margin: auto;
+      }
+      #textarea-alerts {
+        font-size:1.1em;
+        color: #D70202;
+        width: 90%;
+        margin: auto;
+      }
+      #textarea-connections-check {
+        font-size:1.1em;
+        width: 90%;
+        margin: auto;
+      }
+    }
+  }
+  .change-type-div {
+    font-size:1em;
+    li {
+      .pure-menu-link {
+        color: black;
+        font-size: 1.2em;
+      }
+    }
+  }
+  /*
+    .suggestion-type-selector{
+      display:flex;
+      height: 100%;
+      width:25%;
+        flex-direction: column;
+        .change-type-div{
+          width: 90%;
+          margin-left:auto;
+          margin-right:auto; 
+           min-height:5vh;
+        font-size: 1.2em;
+        }
+        .rec-type-text{
+          width: 90%;
+          margin-left:auto;
+          margin-right:auto;
+        }
+      } 
+      
+      
+
+    .suggestion-buttons-div{
+      display:flex;
+      margin:auto;
+      #suggestion-menu{
+        height: 100%;
+        margin:auto;
+      }
+    }
+    */
+}

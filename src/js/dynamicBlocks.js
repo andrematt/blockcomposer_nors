@@ -1,5 +1,4 @@
 
-
 Blockly.Blocks['rule'] = {
   init: function () {
     this.hat = "cap";
@@ -32,7 +31,6 @@ Blockly.Blocks['rule'] = {
 };
 
 
-
 Blockly.Blocks['not_dynamic'] = {
   init: function () {
     var checkbox = new Blockly.FieldCheckbox("false", function (pxchecked) {
@@ -41,15 +39,12 @@ Blockly.Blocks['not_dynamic'] = {
     this.setMovable(false);
     this.blockType = "not_dynamic";
     this.appendDummyInput()
-      .appendField("Not");
+      .appendField("Negation is applied to this block");
     this.appendDummyInput()
-      .appendField("(Optional) when: ")
-      .appendField(checkbox, 'when_input');
+    //  .appendField("(Optional) when: ")
+    //  .appendField(checkbox, 'when_input');
 
     this.setPreviousStatement(true);
-    //this.setColour('#3848AC');
-    //Blockly.HSV_SATURATION = 0.67;// 0 (inclusive) to 1 (exclusive), defaulting to 0.45
-    //Blockly.HSV_VALUE = 0.67; // 0 (inclusive) to 1 (exclusive), defaulting to 0.65
     this.setColour(210);
     this.setTooltip("");
     this.setHelpUrl("");
@@ -228,413 +223,148 @@ Blockly.Blocks['parallel_dynamic'] = {
 
 };
 
-///////////////////// Non usati
-//esempi di mutationtodom etc
-//https://stackoverflow.com/questions/46277625/initialize-a-blockly-mutator-within-javascript
+function ColourGradient() {
 
-Blockly.Blocks['parallel_dynamic_statements'] = {
-  init: function () {
-    let initialValue = 2;
-    let myField = new Blockly.FieldNumber(initialValue, 1, 10, "BRANCHES", function (value) {
-      if (this.sourceBlock_) {
-        this.sourceBlock_.updateShape_(value);
-      }
-    });
-    var checkbox = new Blockly.FieldCheckbox("false", function (pxchecked) {
-      this.sourceBlock_.updateShape_(pxchecked);
-    });
-
-    this.appendDummyInput()
-      .appendField("Parallel branches");
-    this.appendValueInput("EXTERNAL_EXCEPTION");
-    this.appendStatementInput("HIDE_ME")
-      .setCheck(null);
-    this.appendDummyInput()
-      .appendField(myField, 'when');
-
-    //.appendField(myField, 'when');
-
-    this.setColour(230);
-    this.setPreviousStatement(true, null);
-    this.setNextStatement(true, null);
-    //this.setOutput(true, null);
-    this.setTooltip("");
-    this.setHelpUrl("");
-  },
-  updateShape_: function (branches_number) {
-    if (branches_number) {
-
-      for (let i = 0; i < 10; i++) {
-        let myName = "branch_" + i;
-        if (this.getInput(myName)) {
-          this.removeInput(myName);
-          //this.removeInput("HIDE_ME");
-        }
-      }
-      for (let i = 0; i < branches_number; i++) {
-        // this.appendStatementInput("HIDE_ME")
-        //.setCheck(null);
-        let stdIndex = i + 1;
-        let myName = "branch_" + i;
-        let myLabel = "Branch " + stdIndex + ": ";
-        this.appendStatementInput(myName).appendField(myLabel);
-      }
-    }
-  },
-};
-
-Blockly.Blocks['lists_create_with'] = {
-  /**
-   * Block for creating a list with any number of elements of any type.
-   * @this Blockly.Block
+  var svg = null;		/* SVG root Element */
+  var svgNS = null;	/* SVG namespace */
+  var defs = null;	/* SVG defs Element*/
+  var id = null;		/* Block Id */
+  
+/**
+   * Constructor inits SVG DOM.
    */
-  init: function () {
-    this.setHelpUrl(Blockly.Msg['LISTS_CREATE_WITH_HELPURL']);
-    this.setStyle('list_blocks');
-    this.itemCount_ = 2;
-    //this.updateShape_();
-    this.setOutput(true, 'Array');
-    this.setMutator(new Blockly.Mutator(['lists_create_with_item']));
-    this.setTooltip(Blockly.Msg['LISTS_CREATE_WITH_TOOLTIP']);
-  },
+  var __construct = function() {
+      svg = document.getElementsByTagName("svg")[0];
+      defs = svg.getElementsByTagName("defs")[0];   
+      svgNS = svg.namespaceURI;
+  }()
+
   /**
-   * Create XML to represent list inputs.
-   * @return {!Element} XML storage element.
-   * @this Blockly.Block
-   */
-  mutationToDom: function () {
-    //var container = document.createElement('mutation');
-    //container.setAttribute('items', this.itemCount_);
-    //return container;
-  },
-  /**
-   * Parse XML to restore the list inputs.
-   * @param {!Element} xmlElement XML storage element.
-   * @this Blockly.Block
-   */
-  domToMutation: function (xmlElement) {
-    //this.itemCount_ = parseInt(xmlElement.getAttribute('items'), 10);
-    //this.updateShape_();
-  },
-  /**
-   * Populate the mutator's dialog with this block's components.
-   * @param {!Blockly.Workspace} workspace Mutator's workspace.
-   * @return {!Blockly.Block} Root block in mutator.
-   * @this Blockly.Block
-   */
-  decompose: function (workspace) {
-    var containerBlock = workspace.newBlock('lists_create_with_container');
-    containerBlock.initSvg();
-    var connection = containerBlock.getInput('STACK').connection;
-    for (var i = 0; i < this.itemCount_; i++) {
-      var itemBlock = workspace.newBlock('lists_create_with_item');
-      itemBlock.initSvg();
-      connection.connect(itemBlock.previousConnection);
-      connection = itemBlock.nextConnection;
-    }
-    return containerBlock;
-  },
-  /**
-   * Reconfigure this block based on the mutator dialog's components.
-   * @param {!Blockly.Block} containerBlock Root block in mutator.
-   * @this Blockly.Block
-   */
-  compose: function (containerBlock) {
-    var itemBlock = containerBlock.getInputTargetBlock('STACK');
-    // Count number of inputs.
-    var connections = [];
-    while (itemBlock) {
-      connections.push(itemBlock.valueConnection_);
-      itemBlock = itemBlock.nextConnection &&
-        itemBlock.nextConnection.targetBlock();
-    }
-    // Disconnect any children that don't belong.
-    for (var i = 0; i < this.itemCount_; i++) {
-      var connection = this.getInput('ADD' + i).connection.targetConnection;
-      if (connection && connections.indexOf(connection) == -1) {
-        connection.disconnect();
+   * Setting a horizontal colour gradient from the colour of this block
+ * to the colour of the parent block.
+ * 
+ * @param {Blockly.Block} block Current block that has the starting colour for the gradient.
+   * @param {String} startColor Color as hex value for starting the gradient.
+ * @param {String} endColor Color as hex value for ending the gradient.
+ */
+  this.setHorizontalGradient = function(block, startColor, endColor) {
+      var parentBlock = block.getParent();
+  id = "gradient_" + parentBlock.id + "_" + block.id;
+  
+      var colors = {
+          start : (startColor) ? startColor : parentBlock.getColour(),
+          end : (endColor) ? endColor: block.getColour()
+      }; 
+
+      var parentBlockSvg = parentBlock.getSvgRoot().getElementsByClassName("blocklyPath")[0];
+      var gradientNode = document.getElementById(id);
+      var stops = [
+          { "offset" : "20%", "stop-color" : colors.start },
+          { "offset" : "80%", "stop-color" : colors.end }
+      ];
+
+      if (!gradientNode) {    /* Creating new linearGradient Node in SVG */
+          gradientNode = createGradient(stops, false); 
+      } else {                /* Updating linearGradient Node */
+          updateGradient(gradientNode, stops);
       }
-    }
-    this.itemCount_ = connections.length;
-    this.updateShape_();
-    // Reconnect any child blocks.
-    for (var i = 0; i < this.itemCount_; i++) {
-      Blockly.Mutator.reconnect(connections[i], this, 'ADD' + i);
-    }
-  },
+      
+      parentBlockSvg.setAttribute("fill", "url('#" + id + "')");
+  };
+
   /**
-   * Store pointers to any connected child blocks.
-   * @param {!Blockly.Block} containerBlock Root block in mutator.
-   * @this Blockly.Block
+   * Setting a vertical colour gradient of this block.
+ * 
+ * @param {Object} block Current block that has the starting colour for the gradient.
+ * @param {Object} colors JSON with start and stop color for the gradient.
+ * @param {Array} inputs Array with the names of the inputs that should be calculated for the height.
    */
-  saveConnections: function (containerBlock) {
-    var itemBlock = containerBlock.getInputTargetBlock('STACK');
-    var i = 0;
-    while (itemBlock) {
-      var input = this.getInput('ADD' + i);
-      itemBlock.valueConnection_ = input && input.connection.targetConnection;
-      i++;
-      itemBlock = itemBlock.nextConnection &&
-        itemBlock.nextConnection.targetBlock();
-    }
-  },
+  this.setVerticalGradient = function(block, colors, inputs) {
+      if (!block && !colors && !inputs)
+          return false;
+
+      id = "gradient_" + block.id;
+
+      /* Disabling because the ColourGradient updates the colour */
+      block.updateColour = function() {};
+
+      var blockSvg = block.getSvgRoot().getElementsByClassName("blocklyPath")[0];
+      var gradientNode = document.getElementById(id);
+      var height = 0;
+      var heightHundredth = 100 / block.getHeightWidth().height;
+      
+      inputs.forEach(function (entry) {
+          var input = block.getInput(entry);
+          if (input)
+              if (input.renderHeight)
+                  height += input.renderHeight;
+      });
+
+      height = heightHundredth * height;
+
+      var stops = [
+          { "offset" : (height - 5) + "%", "stop-color" : colors.start },
+          { "offset" : (height + 5) + "%", "stop-color" : colors.stop }
+      ];
+
+      if (!gradientNode) {    /* Creating new linearGradient Node in SVG */
+          gradientNode = createGradient(stops, true); 
+      } else {                /* Updating linearGradient Node */
+          updateGradient(gradientNode, stops);
+      }
+      
+      blockSvg.setAttribute("fill", "url('#" + id + "')");
+  };
+  
   /**
-   * Modify this block to have the correct number of inputs.
-   * @private
-   * @this Blockly.Block
+   * Updating existing gradient.
+   * 
+   * @param {Element} grad <linearGradient> SVG Element
+   * @param {Json} stops stop attributes
    */
-  updateShape_: function () {
-    if (this.itemCount_ && this.getInput('EMPTY')) {
-      this.removeInput('EMPTY');
-    } else if (!this.itemCount_ && !this.getInput('EMPTY')) {
-      this.appendDummyInput('EMPTY')
-        .appendField(Blockly.Msg['LISTS_CREATE_EMPTY_TITLE']);
-    }
-    // Add new inputs.
-    for (var i = 0; i < this.itemCount_; i++) {
-      if (!this.getInput('ADD' + i)) {
-        var input = this.appendValueInput('ADD' + i);
-        if (i == 0) {
-          input.appendField(Blockly.Msg['LISTS_CREATE_WITH_INPUT_WITH']);
-        }
+  var updateGradient = function(grad, stops) {
+      var stopNodes = grad.getElementsByTagName("stop");
+             
+      for (var cnt = 0; cnt < stopNodes.length; cnt++) {
+          var attrs = stops[cnt];
+          var stop = stopNodes[cnt];
+
+          for (var attr in attrs) {
+              stop.setAttribute(attr, attrs[attr]);
+          }
       }
-    }
-    // Remove deleted inputs.
-    while (this.getInput('ADD' + i)) {
-      this.removeInput('ADD' + i);
-      i++;
-    }
-  }
-};
-
-Blockly.Blocks['trigger_dynamic'] = {
-  init: function () {
-    var checkbox = new Blockly.FieldCheckbox("false", function (pxchecked) {
-      this.sourceBlock_.updateShape_(pxchecked);
-    });
-    this.appendDummyInput()
-      .appendField("Not");
-    this.appendDummyInput()
-      .appendField("(Optional) when: ")
-      .appendField(checkbox, 'when');
-    this.setOutput(true, null);
-    this.setColour(230);
-    this.setTooltip("");
-    this.setHelpUrl("");
-  },
-  mutationToDom: function () {
-    var container = document.createElement('mutation');
-    var whenInput = (this.getFieldValue('when') == 'TRUE');
-    container.setAttribute('when_input', whenInput);
-    return container;
-  },
-  domToMutation: function (xmlElement) {
-    let hasTimeInput = (xmlElement.getAttribute('when_input') == 'true');
-    this.updateShape_(hasTimeInput);  // Helper function for adding/removing 2nd input.
-  },
-
-  updateShape_: function (whenInput) {
-    // Add or remove a Value Input.
-    var inputExists = this.getInput('when_input');
-    if (whenInput) {
-      if (!inputExists) {
-        //this.appendField("Day");
-        this.appendValueInput('when_input').appendField("Day: ");
-        this.appendValueInput('when_input').appendField("Start time: ");
-        this.appendValueInput('when_input').appendField("End time: ");
-
-        //.setCheck('Number');
+  }.bind(this);
+  
+  /**
+   * Creating linearGradient and appending it to <defs> in svg.
+   * 
+   * @param {Object} stops Json attributes  
+   * @param {bool} isVertical true vertical false horizontal
+ * @return {Element} defs Returning defs element with the created linear gradients.
+   */
+  var createGradient = function(stops, isVertical) {
+      var grad  = document.createElementNS(svgNS, "linearGradient");
+      grad.setAttribute("id", id);
+      
+      if (isVertical) {
+          grad.setAttribute("x1", "0");
+          grad.setAttribute("x2", "0");
+          grad.setAttribute("y1", "1");
+          grad.setAttribute("y2", "0");
       }
-    } else if (inputExists) {
-      this.removeInput('when_input');
-      this.removeInput('when_input');
-      this.removeInput('when_input');
-      //this.removeDummyInput("time");
-    }
 
-  }
-};
+      for (var i = 0; i < stops.length; i++) {
+          var attrs = stops[i];
+          var stop = document.createElementNS(svgNS, "stop");
+          
+          for (var attr in attrs) {
+              if (attrs.hasOwnProperty(attr)) 
+                  stop.setAttribute(attr, attrs[attr]);
+          }
 
-Blockly.Blocks['rule_dynamic'] = {
-  init: function () {
-    let checkbox = new Blockly.FieldCheckbox("false", function (pxchecked) {
-      this.sourceBlock_.updateShape_(pxchecked);
-    });
-    this.appendDummyInput()
-      .appendField("when: ");
-    this.appendStatementInput('events')
-    this.appendDummyInput()
-      .appendField("if (optional): ")
-      .appendField(checkbox, 'if');
-    let hideable_condition = this.appendStatementInput('conditions');
-    hideable_condition.setVisible(false);
-    this.appendDummyInput()
-      .appendField("then:");
-    this.appendStatementInput('actions');
-
-
-    //this.setOutput(true, null);
-    //this.setNextStatement(true, null);
-    this.setColour(230);
-    this.setTooltip("");
-    this.setHelpUrl("");
-  },
-  mutationToDom: function () {
-    var container = document.createElement('mutation');
-    var ifInput = (this.getFieldValue('if') == 'TRUE');
-    container.setAttribute('if_input', ifInput);
-    return container;
-  },
-  domToMutation: function (xmlElement) {
-    let hasIfInput = (xmlElement.getAttribute('if_input') == 'true');
-    this.updateShape_(hasIfInput);  // Helper function for adding/removing 2nd input.
-  },
-  updateShape_: function (ifInput) {
-    // Add or remove a Value Input.
-    //var inputExists = this.getInput('if_input');
-    if (ifInput) {
-      //if (!inputExists) {
-      this.inputList.forEach(function (element) {
-        if (element.name === "conditions") {
-          element.setVisible(true);
-
-        }
-      })
-      this.appendDummyInput("dummy"); //force block reload
-      this.removeInput("dummy");
-      //}
-    } else {
-
-      let myContainerBlock = this;
-      this.inputList.forEach(function (element) {
-        if (element.name === "conditions") {
-
-          let children = element.getConnection;
-          let children2 = element.getConnectedBlock;
-          //element.dispose();
-          element.setVisible(false);
-          element.appendDummyInput("dummy");
-        }
-      })
-      //hideable_condition.setVisible(false);
-      //this.removeInput('if_input');
-      this.appendDummyInput("dummy"); //force block reload
-      this.removeInput("dummy");
-    }
-
-  }
-};
-
-
-Blockly.Blocks['after_dynamic'] = {
-  init: function () {
-    //let initialValue = 2;
-    var checkbox = new Blockly.FieldCheckbox("false", function (pxchecked) {
-      this.sourceBlock_.updateShape_(pxchecked);
-    });
-    this.appendDummyInput()
-      .appendField("Wait after:")
-    //.appendField(myField, 'when');
-    this.appendValueInput('then_do').appendField("Then do: ");
-    this.setColour(230);
-    this.setNextStatement(true, null);
-    this.setPreviousStatement(true, null);
-    this.setTooltip("");
-    this.setHelpUrl("");
-  },
-  mutationToDom: function () {
-    var container = document.createElement('mutation');
-    var whenInput = (this.getFieldValue('when') == 'TRUE');
-    container.setAttribute('when_input', whenInput);
-    return container;
-  },
-  domToMutation: function (xmlElement) {
-    let hasTimeInput = (xmlElement.getAttribute('when_input') == 'true');
-    this.updateShape_(hasTimeInput);  // Helper function for adding/removing 2nd input.
-  },
-
-  updateShape_: function (checked) {
-    //todo: questo deve modificare il codice che si genera
-  },
-};
-
-
-Blockly.Blocks['action_dynamic'] = {
-  init: function () {
-    var checkbox = new Blockly.FieldCheckbox("false", function (pxchecked) {
-      this.sourceBlock_.updateShape_(pxchecked);
-    });
-    this.appendDummyInput()
-      .appendField("Wait after:")
-    //.appendField(myField, 'when');
-    this.appendValueInput('then_do').appendField("Then do: ");
-    this.setColour(230);
-    this.setNextStatement(true, null);
-    this.setPreviousStatement(true, null);
-    this.setTooltip("");
-    this.setHelpUrl("");
-  },
-  mutationToDom: function () {
-    var container = document.createElement('mutation');
-    var whenInput = (this.getFieldValue('when') == 'TRUE');
-    container.setAttribute('when_input', whenInput);
-    return container;
-  },
-  domToMutation: function (xmlElement) {
-    let hasTimeInput = (xmlElement.getAttribute('when_input') == 'true');
-    this.updateShape_(hasTimeInput);  // Helper function for adding/removing 2nd input.
-  },
-
-  updateShape_: function (checked) {
-
-  },
-};
-
-Blockly.Blocks['not_dynamic_old'] = {
-
-  init: function () {
-    var checkbox = new Blockly.FieldCheckbox("false", function (pxchecked) {
-      this.sourceBlock_.updateShape_(pxchecked);
-    });
-    this.appendDummyInput()
-      .appendField("Not");
-    this.appendDummyInput()
-      .appendField("(Optional) when: ")
-      .appendField(checkbox, 'when_input');
-
-    this.setPreviousStatement(true);
-    this.setColour(230);
-    this.setTooltip("");
-    this.setHelpUrl("");
-  },
-  mutationToDom: function () {
-    var container = document.createElement('mutation');
-    var whenInput = (this.getFieldValue('when_input') == 'TRUE');
-    container.setAttribute('when_input', whenInput);
-    return container;
-  },
-  domToMutation: function (xmlElement) {
-    let hasTimeInput = (xmlElement.getAttribute('when_input') == 'true');
-    // Updateshape è una helper function: non deve essere chiamata direttamente ma 
-    // tramite domToMutation, altrimenti non viene registrato che il numero di 
-    // inputs è stato modificato
-    this.updateShape_(hasTimeInput);
-  },
-
-  updateShape_: function (passedValue) {
-    // Aggiunge o rimuove i value inputs
-    if (passedValue) {
-      //if(whenInput){
-      this.appendValueInput('when_input_day').appendField("Day: ");
-      this.appendValueInput('when_input_start_hour').appendField("Start time: ");
-      this.appendValueInput('when_input_end_hour').appendField("End time: ");
-    }
-    else {
-      if (this.getInput('when_input_day') && this.getInput('when_input_start_hour') && this.getInput('when_input_end_hour')) {
-        this.removeInput('when_input_day');
-        this.removeInput('when_input_start_hour');
-        this.removeInput('when_input_end_hour');
+          grad.appendChild(stop);
       }
-    }
-  }
-};
+
+      return defs.appendChild(grad);
+  }.bind(this);
+}

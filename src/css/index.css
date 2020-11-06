@@ -1,0 +1,45 @@
+.splash-login-container {
+  font-family: "Fira Sans", sans-serif;
+  font-size: 1.3em;
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  background: #5b78b6;
+  background: linear-gradient(0deg, #5b78b6 0%, white 33%, white 100%);
+}
+.splash-login-container .splash-login {
+  display: grid;
+  margin: auto;
+  width: 80%;
+  height: 80%;
+  grid-template-columns: 1fr 2fr;
+  grid-template-rows: 1fr;
+  grid-column-gap: 0px;
+  grid-row-gap: 0px;
+}
+.splash-login-container .splash-login .login-text {
+  grid-area: 1/1/2/2;
+}
+.splash-login-container .splash-login .login-text h1 {
+  margin: 25px;
+}
+.splash-login-container .splash-login .login-text .splash-text {
+  margin: 15px;
+  margin-bottom: 30px;
+}
+.splash-login-container .splash-login .login-img {
+  grid-area: 1/2/2/3;
+}
+.splash-login-container .splash-login .login-img .splash-background img {
+  width: 100%;
+  height: 100%;
+}
+
+a.disabled {
+  color: black;
+  text-decoration: none;
+  pointer-events: none;
+  cursor: default;
+}
+
+/*# sourceMappingURL=index.css.map */

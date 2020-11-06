@@ -1,9 +1,8 @@
 import { getUserName, getWorkspace, getTriggerInfo, getHighlightedRule, 
          createRuleBlocksObj, createRuleBlocksStr, getTriggerWithMyCategory,
-         getActionInfo, getElementsInWorkspace, getTriggerWithNoNextConnection 
+         getActionInfo, getTriggerWithNoNextConnection, getRuleSequence
         } from "./main.js";
 import {generateElementAttributeTable} from "./block_suggestor.js";
-import {getLoggedUser} from "./login.js";
 import {printPassedError} from "./textarea_manager.js";
 import {createUpdateAction, getFirstNextOperator, haveSameOperator, 
         sendRuleDeactivationToNode, getRuleActivationStatus} from "./send_to_node.js";
@@ -108,7 +107,7 @@ export async function saveRuleInDB() {
   let blocksDb = myWorkspace.blockDB_;
   let rule_obj = makeRuleObj(blocksDb, false, id);
   let rule_obj_str = JSON.stringify(rule_obj);
-  let rule_sequence = getElementsInWorkspace(); 
+  let rule_sequence = getRuleSequence(); 
   let rule_sequence_str = JSON.stringify(rule_sequence.elements);
   let rule_elementAttributeTable = generateElementAttributeTable(id, rule_obj);
   //let rule_elementAttributeTable_str = JSON.stringify(rule_elementAttributeTable);
@@ -263,12 +262,54 @@ export async function getGraphsFromDB(triggerName){
 }
 
 /**
+ * Get di tutte le regole di un utente usando async/await
+ */
+export async function getAllFromDBUser(userName) {
+  "use strict";
+  let result;
+  if(userName){
+  try {
+    result = await $.ajax({
+      type: "POST",
+      url: GLOBALS.db_access_url,
+      dataType: 'json',
+      data: { functionname: 'getAllFromUser', arguments: [userName] },
+    });
+    return result.result;
+  } catch (error) {
+    console.error(error);
+  }
+  }
+}
+
+/**
+ * Get di tutte le regole di un utente usando async/await.
+ * Vengono presi tutti i campi della regola. 
+ */
+export async function getAllFromDBUserFullData(userName) {
+  "use strict";
+  let result;
+  if(userName){
+  try {
+    result = await $.ajax({
+      type: "POST",
+      url: GLOBALS.db_access_url,
+      dataType: 'json',
+      data: { functionname: 'getAllFromUserFullRule', arguments: [userName] },
+    });
+    return result.result;
+  } catch (error) {
+    console.error(error);
+  }
+  }
+}
+
+/**
  * Get di tutte le regole dal db usando async/await
  */
 export async function getAllFromDB() {
   "use strict";
   let result;
-  //let user = getLoggedUser();
   let user = "allUsers";
   if(user){
   try {
@@ -277,53 +318,6 @@ export async function getAllFromDB() {
       url: GLOBALS.db_access_url,
       dataType: 'json',
       data: { functionname: 'getAll', arguments: [user] },
-    });
-    return result.result;
-  } catch (error) {
-    console.error(error);
-  }
-  }
-}
-
-/**
- * Get di tutte le regole dal db usando async/await
- */
-export async function getAllSequencesFromDB() {
-  "use strict";
-  let result;
-  //let user = getLoggedUser();
-  let user = "allUsers";
-  if(user){
-  try {
-    result = await $.ajax({
-      type: "POST",
-      url: GLOBALS.db_access_url,
-      dataType: 'json',
-      data: { functionname: 'getAllSequences', arguments: [user] },
-    });
-    return result.result;
-  } catch (error) {
-    console.error(error);
-  }
-  }
-}
-
-
-/**
- * Get di tutte le regole dal db usando async/await
- */
-export async function getAllElementAttFromDB() {
-  "use strict";
-  let result;
-  //let user = getLoggedUser();
-  let user = "allUsers";
-  if(user){
-  try {
-    result = await $.ajax({
-      type: "POST",
-      url: GLOBALS.db_access_url,
-      dataType: 'json',
-      data: { functionname: 'getAllElementAtt', arguments: [user] },
     });
     return result.result;
   } catch (error) {
@@ -358,12 +352,56 @@ export function getAllFromDBAjax() {
 }
 
 /**
+ * Get di tutte le sequenze dal db usando async/await
+ */
+export async function getAllSequencesFromDB() {
+  "use strict";
+  let result;
+  let user = "allUsers";
+  if(user){
+  try {
+    result = await $.ajax({
+      type: "POST",
+      url: GLOBALS.db_access_url,
+      dataType: 'json',
+      data: { functionname: 'getAllSequences', arguments: [user] },
+    });
+    return result.result;
+  } catch (error) {
+    console.error(error);
+  }
+  }
+}
+
+
+/**
+ * Get di tutte le righe della element/attribute table dal db usando async/await
+ */
+export async function getAllElementAttFromDB() {
+  "use strict";
+  let result;
+  let user = "allUsers";
+  if(user){
+  try {
+    result = await $.ajax({
+      type: "POST",
+      url: GLOBALS.db_access_url,
+      dataType: 'json',
+      data: { functionname: 'getAllElementAtt', arguments: [user] },
+    });
+    return result.result;
+  } catch (error) {
+    console.error(error);
+  }
+  }
+}
+
+/**
  * 
  * @param {*} id 
  */
 export async function getOneFromDB(id) {
   "use strict";
-  //console.log("get one from db!!");
   let result;
   try {
     result = await $.ajax({
@@ -372,7 +410,6 @@ export async function getOneFromDB(id) {
       dataType: 'json',
       data: { functionname: 'getOne', arguments: [id] },
     });
-    //console.log(result.result);
     return result.result;
   } catch (error) {
     console.error(error);
@@ -385,7 +422,7 @@ export async function getOneFromDB(id) {
  * @param {*} actualBlock 
  */
 export function getNextBlockAction(actualBlock){
-  let elementsInWorkspace = getElementsInWorkspace();
+  let elementsInWorkspace = getRuleSequence();
   let index = elementsInWorkspace.elements.indexOf(actualBlock.type); //TYPE???
   if(index === -1){
     console.log("error: index not found in block in rule");
@@ -408,7 +445,7 @@ export function getNextBlockAction(actualBlock){
  * @param {*} actualBlock 
  */
 export function getNextBlockTrigger(actualBlock){
-  let elementsInWorkspace = getElementsInWorkspace();
+  let elementsInWorkspace = getRuleSequence();
   let index = elementsInWorkspace.elements.indexOf(actualBlock.type);
   if(index === -1){
     console.log("error: index not found in block in rule");
@@ -653,7 +690,7 @@ function createTriggerArr(_rule) {
   "use strict";
   let triggerList = [];
   for (let block in _rule.blocks) {
-    if (_rule.blocks[block].isTrigger) {
+    if (_rule.blocks[block].isTrigger || _rule.blocks[block].isTriggerArray) {
       let trigger = {};
       //  console.log(_rule.blocks[block]);
       trigger.triggerType = _rule.blocks[block].childBlocks_[0].type; 
@@ -1201,7 +1238,7 @@ function makeRuleObj(blockDb, isUpdate, id) {
   _rule.blocks = myWorkspace.getAllBlocks(true);
   _rule.id = id;
   _rule.name = document.getElementById('rule_name').value;
-  _rule.author = getLoggedUser(); 
+  _rule.author = getUserName(); 
   _rule.priority = document.getElementById('priority').value;
   _rule.triggers = createTriggerArr(_rule);
   _rule.actions = createActionArr(_rule);

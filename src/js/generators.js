@@ -1,6 +1,10 @@
 import { getWorkspace, getTriggerList, setTriggerList, getActionList, setActionList} from "./main.js";
 let lastLinkedBlockId;
 
+Blockly.JavaScript['event-condition'] = function(block) {
+  return 'TODO json';
+};
+
 Blockly.JavaScript['action_placeholder'] = function(block) {
   return 'TODO json';
 };
