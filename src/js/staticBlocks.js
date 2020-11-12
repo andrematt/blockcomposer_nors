@@ -1,30 +1,36 @@
 goog.provide('Blockly.Blocks.myblocks');
 goog.require('Blockly.Blocks');
 
+
 Blockly.Blocks['event-condition'] = {
 	init: function () {
 		this.jsonInit({
-			"type": "block_type",
-			"message0": "When (event) %1",
+			"type": "block_type", 
+			"message0": "%1 When",
 			"args0": [
-				{
-					"type": "field_image",
-					"src": "../src/img/event.jpeg",
-					"width": 25,
-					"height": 25,
-					"alt": "*",
-					"flipRtl": false
-				}
+			  {
+				"type": "field_dropdown",
+				"name": "triggerType",
+				"options": [
+				  [
+					"event",
+					"EVENT"
+				  ],
+				  [
+					"condition",
+					"CONDITION"
+				  ]
+				]
+			  }
 			],
 			"output": "Number", 
 			"colour": "#065699",
-			"tooltip": "Punctual happening in a time frame",
+			"tooltip": "event / condition selection block",
 			"helpUrl": ""
 		});
 		this.setMovable(false);
 	}
 };
-
 
 Blockly.Blocks['event'] = {
 	init: function () {

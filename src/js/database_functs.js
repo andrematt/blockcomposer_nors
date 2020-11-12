@@ -6,6 +6,7 @@ import {generateElementAttributeTable} from "./block_suggestor.js";
 import {printPassedError} from "./textarea_manager.js";
 import {createUpdateAction, getFirstNextOperator, haveSameOperator, 
         sendRuleDeactivationToNode, getRuleActivationStatus} from "./send_to_node.js";
+import {createTimestamp} from "./utils.js";
  
 import GLOBALS from "./ctx_sources.js";
 let lastDepth = 0;
@@ -114,14 +115,13 @@ export async function saveRuleInDB() {
   let first_trigger = rule_sequence[0];
   let user_name =  getUserName();//window.localStorage.getItem('user');
   let rule_name = document.getElementById('rule_name').value;
-  let timestamp = Date.now();
-  let timestamp_str = "" + timestamp;
+  let timestamp = createTimestamp();
   if (user_name && rule_sequence && rule_obj && rule_elementAttributeTable) {
 //let saveResult = await saveGraph(id, user_name, rule_graph_str, first_trigger, ruleTriggersRealNameStr, ruleActionsRealNameStr, timestamp_str).then();
 //saveGraphNew(rule_id, user_name, rule_name, timestamp_str, ruleGraphArr).then();
 await saveSequence(id, rule_sequence_str).then();
 await saveElementAttribute(rule_elementAttributeTable).then();
-saveBlocks(id, user_name, rule_name, rule_obj_str, pretty_dom_xml, first_trigger, timestamp_str, ruleTriggersStr, ruleActionsStr);
+saveBlocks(id, user_name, rule_name, rule_obj_str, pretty_dom_xml, first_trigger, timestamp, ruleTriggersStr, ruleActionsStr);
 }
  
 }
@@ -889,6 +889,8 @@ function prepareTmpRule(_rule) {
     author: _rule.author,
     ruleName: _rule.name,
     priority: _rule.priority,
+    goal: _rule.goal,
+    timestamp: _rule.timeStamp,
     triggers: [],
     actions: [],
     actionMode: _rule.actionMode
@@ -1240,10 +1242,15 @@ function makeRuleObj(blockDb, isUpdate, id) {
   _rule.name = document.getElementById('rule_name').value;
   _rule.author = getUserName(); 
   _rule.priority = document.getElementById('priority').value;
+  _rule.goal = document.getElementById('goal').value;
+  _rule.timeStamp = createTimestamp();
   _rule.triggers = createTriggerArr(_rule);
   _rule.actions = createActionArr(_rule);
   _rule.actionMode = getActionMode(_rule);
-  if (_rule.priority === undefined) {
+  if(typeof _rule.priority == 'number' && (_rule.priority > 10 || _rule.priority < 0)) {
+    _rule.priority = 1;
+  }
+  if (_rule.priority === undefined || _rule.priority === "") {
     _rule.priority = 1;
   }
   if (_rule.actionMode === undefined || _rule.actionMode === '') {

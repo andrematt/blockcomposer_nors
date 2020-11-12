@@ -9,6 +9,7 @@ import * as DomModifiers from "./dom_modifiers.js";
 import * as errorMessages from "./textarea_manager.js";
 import * as neuralNetwork from "./neural_network.js";
 import * as RS_values from "./rs_values.js";
+import * as ModalManager from "./modal_manager.js"
 import { CPT } from "./CPT/index.js"
 
 /**
@@ -44,6 +45,7 @@ let inconsistentActionSequence = false;
 let inconsistentActionMessage = "";
 let triggerList = [];
 let actionList = [];
+let clickedEventConditionBlock;
 let lastBlock; // Last block inserted in workspace
 let CPTmodel;
 let ruleSuggestorStatus;
@@ -238,7 +240,7 @@ let recommendationType = "Step by step recommendations";
         .appendField(new Blockly.FieldTextInput("alarm text"), "ALARM_TEXT");
       block.appendDummyInput("NOTIFICATION")
         .appendField("Notification mode:")
-        .appendField(new Blockly.FieldDropdown([["sms", "SMS"], ["email", "EMAIL"], ["notification", "NOTIFICATION"]]), "NOTIFICATION MODE");
+        .appendField(new Blockly.FieldDropdown([["sms", "SMS"], ["email", "EMAIL"], ["notification", "NOTIFICATION"]]), "NOTIFICATION_MODE");
       block.appendDummyInput("TIMES")
         .appendField("Send times:")
         .appendField(new Blockly.FieldDropdown([["1", "ONCE"], ["2", "TWO_TIMES"], ["3", "THREE_TIMES"]]), "REPETITIONS");
@@ -253,7 +255,7 @@ let recommendationType = "Step by step recommendations";
         .appendField(new Blockly.FieldTextInput("reminder text"), "REMINDER_TEXT");
       block.appendDummyInput("NOTIFICATION")
         .appendField("Notification mode:")
-        .appendField(new Blockly.FieldDropdown([["sms", "SMS"], ["email", "EMAIL"], ["notification", "NOTIFICATION"]]), "NOTIFICATION MODE");
+        .appendField(new Blockly.FieldDropdown([["sms", "SMS"], ["email", "EMAIL"], ["notification", "NOTIFICATION"]]), "NOTIFICATION_MODE");
       block.appendDummyInput("TIMES")
         .appendField("Send times:")
         .appendField(new Blockly.FieldDropdown([["1", "ONCE"], ["2", "TWO_TIMES"], ["3", "THREE_TIMES"]]), "REPETITIONS");
@@ -851,19 +853,11 @@ let recommendationType = "Step by step recommendations";
   <sep gap = "8"></sep>
 </xml>
 ` ;
-
-    //let treeCopy = JSON.parse(JSON.stringify(newTree));
-    //toolboxTree = treeCopy;
-    //something is broken in newTree
-    console.log(newTree);
     workspace.updateToolbox(newTree);
-
-    //aggiorna anche l'xml!!
+    //console.log("UPDATING XML!");
     workspace.toolbox_.refreshSelection();
-    console.log("UPDATING XML!");
     document.getElementById('toolbox').innerHTML = newTree;
-    console.log(document.getElementById('toolbox'));
-
+    //console.log(document.getElementById('toolbox'));
   }
 
   /**
@@ -949,25 +943,25 @@ let recommendationType = "Step by step recommendations";
    * replace unsafe chars
    * @param {*} unsafe 
    */
-function escapeXml(unsafe) {
-  let result;
-  try {
-    result = unsafe.replace(/[<>&'"]/g, function (c) {
+  function escapeXml(unsafe) {
+    let result;
+    try {
+      result = unsafe.replace(/[<>&'"]/g, function (c) {
         switch (c) {
-            case '<': return '&lt;';
-            case '>': return '&gt;';
-            case '&': return '&amp;';
-            case '\'': return '&apos;';
-            case '"': return '&quot;';
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '&': return '&amp;';
+          case '\'': return '&apos;';
+          case '"': return '&quot;';
         }
-    });
-    return result;
+      });
+      return result;
+    }
+    catch (e) {
+      console.log(e);
+      console.log(unsafe);
+    }
   }
-  catch (e){
-    console.log(e);
-    console.log(unsafe);
-  }
-}
 
   /**
    * Crea ricorsivamente l'albero dei trigger
@@ -1155,6 +1149,7 @@ function escapeXml(unsafe) {
   workspace.addChangeListener(Listeners.triggerTypeListenerChild);
   workspace.addChangeListener(Listeners.blockDisconnectListener);
   workspace.addChangeListener(Listeners.triggerListener);
+  workspace.addChangeListener(Listeners.eventConditionBlocksLeftClick);
   workspace.addChangeListener(Listeners.parallelBranchesUpdateNumber);
   workspace.addChangeListener(Listeners.waitToParallelListener);
   workspace.addChangeListener(Listeners.updateCodeListener);
@@ -2401,13 +2396,23 @@ export async function exportAllRules() {
   "use strict";
   let user = getUserName();
   let allRulesForAnUser = await DB.getAllFromDBUserFullData(user).then();
+ /* 
   let pretty = "";
-  allRulesForAnUser.forEach( (e) => {
+  allRulesForAnUser.forEach((e) => {
     pretty += e.rule_obj_str;
     pretty += "\n\n\n\n";
   });
-  let blob = new Blob([pretty], { type: "text/plain;charset=utf-8" });
-  saveAs(blob, "myRules.txt");
+  let blob = new Blob([pretty], { type: "json;charset=utf-8" });
+  saveAs(blob "myRules.json");
+  */
+ let allRulesObjs = [];
+  allRulesForAnUser.forEach((e) => {
+    let rule = JSON.parse(e.rule_obj_str);
+    allRulesObjs.push(rule);
+  });
+ let dataStr = JSON.stringify(allRulesObjs);
+ let dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+  saveAs(dataUri, "myRules.json");
 }
 /**
  * 
@@ -2612,6 +2617,41 @@ export function conditionSelected(blockId) {
 
 /**
  * Extension chiamata in custom-dialog.js quando durante la creazione di un
+ * trigger viene selezionato il tipo "event". Crea il blocco event e lo collega
+ * al trigger.
+ * @param {*} blockId 
+ */
+export function eventChanged(blockId) {
+  let block = myWorkspace.blockDB_[blockId];
+  let connection = block.inputList.filter(e => {
+    return e.name === "TRIGGER_TYPE";
+  })
+  var newBlock = myWorkspace.newBlock('event');
+  newBlock.initSvg();
+  newBlock.render();
+  block.getInput("TRIGGER_TYPE").connection.connect(newBlock.outputConnection);
+}
+
+/**
+ * Extension chiamata in custom-dialog.js quando durante la creazione di un 
+ * trigger viene selezionato il tipo "condition". Crea il blocco condition e lo
+ * collega al trigger.
+ * @param {*} blockId 
+ */
+export function conditionChanged(blockId) {
+  let block = myWorkspace.blockDB_[blockId];
+  let connection = block.inputList.filter(e => {
+    return e.name === "TRIGGER_TYPE";
+  })
+
+  var newBlock = myWorkspace.newBlock('condition');
+  newBlock.initSvg();
+  newBlock.render();
+  block.getInput("TRIGGER_TYPE").connection.connect(newBlock.outputConnection);
+}
+
+/**
+ * Extension chiamata in custom-dialog.js quando durante la creazione di un
  * trigger viene selezionato il tipo "event". Aggiunge un dummy input chiamato
  * "EVENT" al trigger, forza un nuovo caricamento del workspace (altrimenti
  * l'aggiunta di un field non verrebbe catturata dal listener).
@@ -2667,7 +2707,7 @@ export function onSignIn(googleUser) {
  * regola è giusto, se ok controlla trigger, se ok controlla azioni. Usato
  * dal tasto checkRule e inoltre eseguito quando si prova a salvare una regola 
  */
-export function checkRule() {
+export function checkRuleStructure() {
   let onlyOneRuleStatus;
   let triggerSequenceStatus;
   let actionSequenceStatus;
@@ -2695,51 +2735,20 @@ export function checkRule() {
 }
 
 /**
- * 
+ * TODO
+ * Check if the combination of events/condition/actions is not unfeasible, 
+ * i.e. not composed by a sequence of events in "AND" without any condition
  */
-export function ruleNonStandardState() {
-
-  DomModifiers.appendActionRevert("rule non standard state");
-  console.log("RULE NON STANDARD STATE");
-}
-
-/**
- * 
- */
-export function ruleStandardState() {
-  DomModifiers.appendRuleTypeText("rule standard state");
-  console.log("RULE STANDARD STATE");
-}
-
-
-
-/**
- * 
- */
-export function ruleNoState() {
-  DomModifiers.appendRuleTypeText("rule no state");
-  console.log("RULE NO STATE");
-}
-
-/**
- * Avverte che lo stato dell'azione sarà riportato a quello precedente quando
- * ci sono azioni di tipo sostenuto e states
- */
-export function setActionRevert() {
+export function checkRuleMeaning() {
   return "";
+  let onlyOneRuleStatus = checkOnlyOneRule();
+  let result = "not checked";
+  if (onlyOneRuleStatus === "OK") {
+    result = checkEventsWithoutCondition();
+  }
+  return result;
 }
 
-export function removeAtionRevert() {
-  return "";
-}
-
-/**
- * Avverte della possibilità di ripetizione quando ci sono con azione di tipo 
- * immediato o continuativo e states
- */
-function checkActionRepetition() {
-  return "";
-}
 
 /**
  * Controlla che sia presente solo un blocco rule
@@ -2911,6 +2920,18 @@ export function getRuleBlock(workspace = getWorkspace()) { //ES6 default params
       return workspace.blockDB_[block];
     }
   }
+}
+
+/**
+ * TODO
+ * Check that the trigger sequence does not contains events in "and" without 
+ * any condition
+ */
+function checkEventsWithoutCondition(){
+  return;
+  let workspace = getWorkspace();
+  let ruleBlock = getRuleBlock(workspace);
+  let triggers = getAllTriggerInWorkspace();
 }
 
 /**
@@ -3459,8 +3480,8 @@ function localStorageChecker() {
   let user = window.localStorage.getItem('user');
   if (user) {
     currentUser = user;
-//    document.getElementById('user-name').innerHTML = "Logged as: " + currentUser;
-//    document.getElementById('input-username').value = currentUser;
+    //    document.getElementById('user-name').innerHTML = "Logged as: " + currentUser;
+    //    document.getElementById('input-username').value = currentUser;
   }
 }
 
@@ -3476,8 +3497,8 @@ export function saveUserToLocal(userName) {
 /**
  * 
  */
-export function removeUserFromLocal(){
-  localStorage.removeItem("user"); 
+export function removeUserFromLocal() {
+  localStorage.removeItem("user");
 }
 
 /**
@@ -3666,4 +3687,46 @@ export function removeUnusedInputsFromSecondaryWorkspace() {
     }
   }
   //DomModifiers.alignBlocks();
+}
+
+export function eventChange() {
+  let blockId = getClickedEventConditionBlock();
+  let workspace = getWorkspace();
+  let block = workspace.blockDB_[blockId];
+  let parent = block.getParent();
+  block.dispose();
+  let newBlock = myWorkspace.newBlock('event');
+  newBlock.initSvg();
+  newBlock.render();
+  parent.getInput("TRIGGER_TYPE").connection.connect(newBlock.outputConnection);
+  ModalManager.modalEventConditionChangeClose();
+}
+
+export function conditionChange() {
+  let blockId = getClickedEventConditionBlock();
+  let workspace = getWorkspace();
+  let block = workspace.blockDB_[blockId];
+  let parent = block.getParent();
+  block.dispose();
+  let newBlock = myWorkspace.newBlock('condition');
+  newBlock.initSvg();
+  newBlock.render();
+  parent.getInput("TRIGGER_TYPE").connection.connect(newBlock.outputConnection);
+  ModalManager.modalEventConditionChangeClose();
+}
+
+
+/**
+ * 
+ */
+export function getClickedEventConditionBlock() {
+  return clickedEventConditionBlock;
+}
+
+
+/**
+ * 
+ */
+export function setClickedEventConditionBlock(blockId) {
+  clickedEventConditionBlock = blockId;
 }

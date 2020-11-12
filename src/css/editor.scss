@@ -35,7 +35,9 @@ body {
   width:80%;
 }
 
-
+.form-elements{
+  display:flex;
+}
 
 label {
   /* To make sure that all labels have the same size and are properly aligned */
@@ -211,12 +213,30 @@ input:focus {
     margin: 0; /* Magic! */
     padding: 0;
   }
-  #suggestion-workspace-div {
+  #suggestion-workspace-container{
+    display: flex;
+    flex-direction: column;
     width: 25%; /* Or whatever */
     height: 100%; /* Or whatever */
     margin: 0; /* Magic! */
     padding: 0;
+    #suggestion-workspace-title{
+      display:flex;
+    width: 100%; /* Or whatever */
+    height: 10%;
+    margin: 0; /* Magic! */
+    padding: 0;
+    #suggestion-workspace-title-text{
+      margin:auto;
+    }
+    }
+  #suggestion-workspace-div {
+    width: 100%; /* Or whatever */
+    height: 90%; /* Or whatever */
+    margin: 0; /* Magic! */
+    padding: 0;
   }
+}
 }
 
 .support-container {

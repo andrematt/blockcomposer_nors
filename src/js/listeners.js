@@ -8,7 +8,7 @@ import {
   extractChildRecursive, getRuleBlocksArr, cleanRuleBlocksArr,
   ruleSuggestorManager, getSuggestionWorkspace, checkInTriggerOperators,
   checkInActionOperators, setRuleSequence, getRuleSequence,
-  removeToInputsFromEventTime
+  removeToInputsFromEventTime, setClickedEventConditionBlock
 } from "./main.js";
 
 import {
@@ -19,6 +19,8 @@ import {
 import { setActionRevert, removeActionRevert, moveSingleBlockToMain } from "./dom_modifiers.js";
 import { getBlockDesc } from "./block_descriptions.js";
 import { checkConnection } from "./connections_checks.js";
+
+import { modalEventConditionChangeShow } from "./modal_manager.js";
 
 /**
  * when a block is deleted, update the rule sequence
@@ -672,8 +674,23 @@ export function blockDocsListener(event) {
   }
 }
 
-
-
+/**
+ * Listener to catch the clicks on the "event" or "condition" blocks, to show 
+ * again the modal window to choise between the two modalities. 
+ * @param {*} event 
+ */
+export function eventConditionBlocksLeftClick(event) {
+  "use strict";
+  if (event.element === "click") {
+    let workspace = getWorkspace();
+    let block = workspace.blockDB_[event.blockId];
+    if (block && (block.type === "condition" || block.type === "event")) {
+         setClickedEventConditionBlock(block.id);
+         modalEventConditionChangeShow(block); 
+        // Blockly.prompt("Select trigger type: ", event.blockId);
+    }
+  }
+}
 
 /**
  * Listener per quando viene creato un trigger. Se cattura l'evento create, 

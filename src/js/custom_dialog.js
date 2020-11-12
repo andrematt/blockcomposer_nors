@@ -1,5 +1,7 @@
 import { eventSelected, conditionSelected } from "./main.js";
 
+// TODO: delete and just use micromodal
+
 /**
  * Override blockly default prompt
  *

@@ -22,18 +22,21 @@
 
             <div id="logged-button-section">
               <span id="user-name"></span>
-              
-              <span id="google-signout" > 
-                <a href="http://localhost:8080/index.html">Back to home</a>
-              </span>
+
               <!--
             <button id="suggestor-drop" class="pure-button" type="button">
               Move hint to main
             </button>
             -->
+
+              <button id="button-home" class="pure-button" type="button" onclick="location.href='http://localhost:8080/index.html'";>
+                Back to home
+              </button>
+            <!--
               <button id="button-modal-export" class="pure-button" type="button">
                 Export XML
               </button>
+            -->
               <button id="button-modal-check" class="pure-button" type="button">
                 Check rule
               </button>
@@ -62,7 +65,10 @@
 
     <div class="workspaces-container">
       <div id="main-workspace-div"></div>
-      <div id="suggestion-workspace-div"></div>
+      <div id="suggestion-workspace-container">
+        <div id="suggestion-workspace-title"><div id="suggestion-workspace-title-text">Recommendations area</div></div>
+        <div id="suggestion-workspace-div"></div>
+      </div>
     </div>
 
     <div class="support-container">
@@ -178,13 +184,23 @@
         </header>
         <main class="modal__content" id="modal-1-content">
           <form action="/my-handling-form-page" method="post">
-            <div>
-              <label for="rule_name">Rule name:</label>
+            <div class = "form-elements">
+              <label for="rule_name">Name:</label>
               <input type="text" id="rule_name" name="rule_name" required>
             </div>
-            <div>
+            <div class="form-elements">
               <label for="priority">Priority:</label>
               <input type="number" min="1" max="10" id="priority" name="priority">
+            </div>
+            <div class="form-elements">
+              <label for="goal">Goal:</label>
+              <select name="goal" id="goal">
+                <option value="none">--none--</option>
+                <option value="safety">Safety</option>
+                <option value="health">Health</option>
+                <option value="wellbeing">Well-being</option>
+                <option value="comfort">Comfort</option>
+              </select>
             </div>
           </form>
         </main>
@@ -210,18 +226,19 @@
         </header>
         <main class="modal__content" id="modal-2-content">
           <div class="rule-list-container">
-          <p id="rule_list">
-          </p>
-        </div>
+            <p id="rule_list">
+            </p>
+          </div>
         </main>
         <footer class="modal__footer">
-          <button id="button-confirm-get" class="pure-button" data-micromodal-close
-            aria-label="Get this rule">Get rule</button>
+          <button id="button-confirm-get" class="pure-button" data-micromodal-close aria-label="Get this rule">Get
+            rule</button>
           <button class="pure-button" data-micromodal-close aria-label="Close this dialog window">Close</button>
           <button id="button-delete" class="pure-button" data-micromodal-close aria-label="Delete this rule">Delete
             rule</button>
-          <button id="button-export-all" class="pure-button" data-micromodal-close aria-label="Export all rules">Export all rules
-            </button>
+          <button id="button-export-all" class="pure-button" data-micromodal-close aria-label="Export all rules">Export
+            all rules
+          </button>
           <button id="button-activate" class="pure-button" data-micromodal-close
             aria-label="Activate this rule">Activate rule</button>
           <button id="button-deactivate" class="pure-button" data-micromodal-close
@@ -231,42 +248,74 @@
     </div>
   </div>
 
-  <!-- modal sequential rec explaination -->
-  <div class="modal micromodal-slide" id="modal-3" aria-hidden="true">
+  <!-- modal event - condition change -->
+  <div class="modal micromodal-slide" id="modal-event-condition-change" aria-hidden="true">
     <div class="modal__overlay" tabindex="-1" data-micromodal-close>
       <div class="modal__container" role="dialog" aria-modal="true" aria-labelledby="modal-3-title">
         <header class="modal__header">
-          <h2 class="modal__title" id="modal-3-title">
-            Sequential recommendation
+          <h2 class="modal__title" id="modal-event-condition-change-title">
+            Change trigger type
           </h2>
           <button class="modal__close" aria-label="Close modal" data-micromodal-close></button>
         </header>
         <main class="modal__content" id="modal-3-content">
-          <p>
-          </p>
+          <div class="grid-container-event-condition">
+            <div class="event-icon">
+              <p> <img src="src/img/event.jpeg"> </p>
+            </div>
+            <div class="event-desc">
+              <p> Punctual happening in a time frame </p>
+            </div>
+            <div class="event-examples">
+              <p>
+                - when user enters a room, <br>
+                - when it starts to rain, <br>
+                - when kitchen temperature exceedes 30 degrees, <br>
+                - at 8 o'clock
+              </p>
+            </div>
+            <div class="event-button">
+              <p>
+                <button class="pure-button" id="custom-dialog-event-change">Event</button>
+              </p>
+            </div>
+            <div class="condition-icon">
+              <p> <img src="src/img/condition.jpeg"> </p>
+            </div>
+            <div class="condition-desc">
+              <p> Extended state in a time frame </p>
+            </div>
+            <div class="condition-examples">
+              <p>
+                - while user is inside a room, <br>
+                - as long as it's raining, <br>
+                - while kitchen temperature is over 30 degrees, <br>
+                - between 20:00 and 23:30
+              </p>
+            </div>
+            <div class="condition-button">
+              <p>
+                <button class="pure-button" id="custom-dialog-condition-change">Condition</button>
+              </p>
+            </div>
+          </div>
         </main>
-
-        <button class="pure-button" id="whatIfCPT_button">Save and re-score prediction</button>
-        <div id="prediction_rescored_CPT"></div>
-        <footer class="modal__footer">
-          <button class="pure-button" data-micromodal-close aria-label="Close this dialog window">Close</button>
-        </footer>
       </div>
     </div>
   </div>
 
-  <!-- modal full rule explaination -->
-  <div class="modal micromodal-slide" id="modal-4" aria-hidden="true">
+  <!-- modal check rule -->
+  <div class="modal micromodal-slide" id="modal-check" aria-hidden="true">
     <div class="modal__overlay" tabindex="-1" data-micromodal-close>
       <div class="modal__container" role="dialog" aria-modal="true" aria-labelledby="modal-4-title">
         <header class="modal__header">
-          <h2 class="modal__title" id="modal-4-title">
-            Full recommendation
+          <h2 class="modal__title" id="modal-check-title">
+            Check rule
           </h2>
           <button class="modal__close" aria-label="Close modal" data-micromodal-close></button>
         </header>
-        <main class="modal__content" id="modal-4-content">
-          <p> todo
+        <main class="modal__content" id="modal-check-content">
+          <p> 
           </p>
         </main>
         <footer class="modal__footer">
@@ -276,7 +325,7 @@
     </div>
   </div>
 
-  </div> 
+  </div>
 
   <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/pure-min.css"
     integrity="sha384-oAOxQR6DkCoMliIh8yFnu25d7Eq/PHS21PClpwjOTeU2jRSq11vu66rf90/cZr47" crossorigin="anonymous">
@@ -306,10 +355,11 @@
   <script type="module">
     import * as Login from './src/js/login.js';
     import {
-      saveUserToLocal, checkRule, exportSuggestorRule, exportSuggestorDrop,
+      saveUserToLocal, checkRuleStructure, checkRuleMeaning, 
+      exportSuggestorRule, exportSuggestorDrop,
       getWorkspace, exportWorkspace, getRuleSuggestorStatus,
       changeRecommendationType, clearSuggestionWorkspace, ruleSuggestorManager,
-      getLastBlock, newRule, exportAllRules
+      getLastBlock, newRule, exportAllRules, eventChange, conditionChange
     } from './src/js/main.js';
     import {
       saveRuleInDB, getAllFromDB, getOneFromDB, deleteRule,
@@ -332,7 +382,7 @@
      * prima di mostrare la finestra modale di conferma salvataggio
      */
     function saveRuleWrapper() {
-      let checkStatus = checkRule();
+      let checkStatus = checkRuleStructure();
       if (checkStatus === "OK") {
         document.getElementById('textarea-alerts').innerHTML = "";
         document.getElementById('textarea-alerts').innerHTML = "Check: " + checkStatus + ", Saving";
@@ -348,26 +398,15 @@
      * Controlla che la regola attualmente nel workspace sia corretta 
      */
     function checkRuleWrapper() {
-      let checkStatus = checkRule();
-      document.getElementById('textarea-alerts').innerHTML = "";
-      document.getElementById('textarea-alerts').innerHTML = "Check: " + checkStatus;
-    }
-
-    /**
-     * Show the modal for rule explainations
-     */
-    function ModalSuggestorInfoWrapper() {
-      let status = getRuleSuggestorStatus();
-      if (status === "seq") {
-        manageSequentialModal();
-        MicroModal.show('modal-3');
-      }
-      else if (status === "full") {
-        MicroModal.show('modal-4');
-      }
-      else {
-        //shows a text in textarea-alerts saiyng: "no suggestions to explain";
-      }
+      let checkStructure = checkRuleStructure();
+      //let checkMeaning = checkRuleMeaning(); TODO
+      let result =  
+      `
+      Rule structure: ${checkStructure} <br> 
+      `
+      MicroModal.show('modal-check');
+      document.getElementById('modal-check-content').innerHTML = "";
+      document.getElementById('modal-check-content').innerHTML = result;
     }
 
 
@@ -386,9 +425,6 @@
     const buttonSave = document.getElementById("button-modal-save");
     buttonSave.addEventListener("click", saveRuleWrapper, false);
 
-    const buttonExport = document.getElementById("button-modal-export");
-    buttonExport.addEventListener("click", exportWorkspace, false);
-
     const buttonCheck = document.getElementById("button-modal-check");
     buttonCheck.addEventListener("click", checkRuleWrapper, false);
 
@@ -400,7 +436,7 @@
 
     const buttonExportAll = document.getElementById("button-export-all");
     buttonExportAll.addEventListener("click", exportAllRules, false);
-    
+
     const buttonNew = document.getElementById("button-modal-new");
     buttonNew.addEventListener("click", newRule, false);
 
@@ -416,11 +452,11 @@
     const buttonDeactivate = document.getElementById("button-deactivate");
     buttonDeactivate.addEventListener("click", deactivateRule, false);
 
-    //const suggestorWhy = document.getElementById("suggestor-why");
-    //suggestorWhy.addEventListener("click", modalSuggestorInfoWrapper, false);
+    const buttonEventChange = document.getElementById("custom-dialog-event-change");
+    buttonEventChange.addEventListener("click", eventChange, false);
 
-    //const suggestorChange = document.getElementById("suggestor-change");
-    //suggestorChange.addEventListener("click", suggestorTypeWrapper, false);
+    const buttonConditionChange = document.getElementById("custom-dialog-condition-change");
+    buttonConditionChange.addEventListener("click", conditionChange, false)
 
   </script>
 

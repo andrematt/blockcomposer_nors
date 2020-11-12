@@ -388,6 +388,7 @@ export function blocksToSuggestionWorkspace(blocks) {
         block.initSvg();
         block.render();
         console.log(block);
+        block.setMovable(false);
       }
   }
   alignBlocks();
