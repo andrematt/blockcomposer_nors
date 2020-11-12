@@ -71,6 +71,27 @@ form {
   max-width: 100vw;
   height: 100%;
 }
+#modal-2 .modal__container .rule-list-container {
+  display: flex;
+  width: 100%;
+  height: 50vh;
+}
+#modal-2 .modal__container .rule-list-container #rule_list {
+  margin-left: 5%;
+}
+#modal-2 .modal__container #modal-footer-buttons-container {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  grid-template-rows: 1fr;
+  grid-column-gap: 0px;
+  grid-row-gap: 0px;
+}
+#modal-2 .modal__container #modal-footer-buttons-container #modal-footer-left-buttons {
+  grid-area: 1/1/2/2;
+}
+#modal-2 .modal__container #modal-footer-buttons-container #modal-footer-right-buttons {
+  grid-area: 1/2/2/3;
+}
 
 #modal-3 .modal__container {
   width: 100vw;
@@ -294,9 +315,11 @@ input:focus {
 }
 .support-container .textarea-container .textarea-div #textarea-alerts {
   font-size: 1.1em;
-  color: #D70202;
   width: 90%;
   margin: auto;
+}
+.support-container .textarea-container .textarea-div #textarea-alerts .warning {
+  color: #D70202;
 }
 .support-container .textarea-container .textarea-div #textarea-connections-check {
   font-size: 1.1em;

@@ -25,7 +25,7 @@ export function getBlockDesc(block) {
       return `Trigger labeled as events will be checked as punctual happenings in a time frame.<br><br>`;
       break;
     case "condition":
-      return "Trigger labeled as conditions will be checked as extended happenings in a time frame.<br><br>";
+      return "Trigger labeled as conditions will be checked as protracted happenings in a time frame.<br><br>";
       break;
     case "parallel_dynamic":
       return "The actions inserted in the parallel branches will be started at the same time, independently of the other branches.";

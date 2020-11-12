@@ -2,6 +2,7 @@
 
 <html>
 <link rel="icon" href="./src/img/favicon.ico">
+
 <head>
 </head>
 
@@ -29,10 +30,11 @@
             </button>
             -->
 
-              <button id="button-home" class="pure-button" type="button" onclick="location.href='http://localhost:8080/index.html'";>
+              <button id="button-home" class="pure-button" type="button"
+                onclick="location.href='http://localhost:8080/index.html'" ;>
                 Back to home
               </button>
-            <!--
+              <!--
               <button id="button-modal-export" class="pure-button" type="button">
                 Export XML
               </button>
@@ -66,7 +68,9 @@
     <div class="workspaces-container">
       <div id="main-workspace-div"></div>
       <div id="suggestion-workspace-container">
-        <div id="suggestion-workspace-title"><div id="suggestion-workspace-title-text">Recommendations area</div></div>
+        <div id="suggestion-workspace-title">
+          <div id="suggestion-workspace-title-text">Recommendations area</div>
+        </div>
         <div id="suggestion-workspace-div"></div>
       </div>
     </div>
@@ -184,7 +188,7 @@
         </header>
         <main class="modal__content" id="modal-1-content">
           <form action="/my-handling-form-page" method="post">
-            <div class = "form-elements">
+            <div class="form-elements">
               <label for="rule_name">Name:</label>
               <input type="text" id="rule_name" name="rule_name" required>
             </div>
@@ -231,18 +235,25 @@
           </div>
         </main>
         <footer class="modal__footer">
-          <button id="button-confirm-get" class="pure-button" data-micromodal-close aria-label="Get this rule">Get
-            rule</button>
-          <button class="pure-button" data-micromodal-close aria-label="Close this dialog window">Close</button>
-          <button id="button-delete" class="pure-button" data-micromodal-close aria-label="Delete this rule">Delete
-            rule</button>
-          <button id="button-export-all" class="pure-button" data-micromodal-close aria-label="Export all rules">Export
-            all rules
-          </button>
-          <button id="button-activate" class="pure-button" data-micromodal-close
-            aria-label="Activate this rule">Activate rule</button>
-          <button id="button-deactivate" class="pure-button" data-micromodal-close
-            aria-label="Deactivate this rule">Deactivate rule</button>
+          <div id="modal-footer-buttons-container">
+            <div id="modal-footer-left-buttons">
+              <button id="button-confirm-get" class="pure-button" data-micromodal-close aria-label="Get this rule">Load
+                rule</button>
+              <button id="button-delete" class="pure-button" data-micromodal-close aria-label="Delete this rule">Delete
+                rule</button>
+              <button id="button-export-all" class="pure-button" data-micromodal-close
+                aria-label="Export all rules">Export
+                all rules
+              </button>
+              <button id="button-activate" class="pure-button" data-micromodal-close
+                aria-label="Activate this rule">Activate rule</button>
+              <button id="button-deactivate" class="pure-button" data-micromodal-close
+                aria-label="Deactivate this rule">Deactivate rule</button>
+            </div>
+            <div class="modal-footer-right-buttons">
+              <button class="pure-button" data-micromodal-close aria-label="Close this dialog window">Close</button>
+            </div>
+          </div>
         </footer>
       </div>
     </div>
@@ -283,7 +294,7 @@
               <p> <img src="src/img/condition.jpeg"> </p>
             </div>
             <div class="condition-desc">
-              <p> Extended state in a time frame </p>
+              <p> Protracted state in a time frame </p>
             </div>
             <div class="condition-examples">
               <p>
@@ -315,7 +326,7 @@
           <button class="modal__close" aria-label="Close modal" data-micromodal-close></button>
         </header>
         <main class="modal__content" id="modal-check-content">
-          <p> 
+          <p>
           </p>
         </main>
         <footer class="modal__footer">
@@ -355,7 +366,7 @@
   <script type="module">
     import * as Login from './src/js/login.js';
     import {
-      saveUserToLocal, checkRuleStructure, checkRuleMeaning, 
+      saveUserToLocal, checkRuleStructure, checkRuleMeaning,
       exportSuggestorRule, exportSuggestorDrop,
       getWorkspace, exportWorkspace, getRuleSuggestorStatus,
       changeRecommendationType, clearSuggestionWorkspace, ruleSuggestorManager,
@@ -400,8 +411,8 @@
     function checkRuleWrapper() {
       let checkStructure = checkRuleStructure();
       //let checkMeaning = checkRuleMeaning(); TODO
-      let result =  
-      `
+      let result =
+        `
       Rule structure: ${checkStructure} <br> 
       `
       MicroModal.show('modal-check');

@@ -91,7 +91,7 @@ export function overrideDialog() {
       <p class="customDialogMessage"></p>
 
       <div class="grid-container-event-condition">
-      <div class="event-icon">  <p> <img src = "../src/img/event.jpeg"> </p> </div>
+      <div class="event-icon">  <p> <img src = "https://giove.isti.cnr.it/demo/pat/src/img/event.jpeg"> </p> </div>
       <div class="event-desc">   <p>     Punctual happening in a time frame  </p>  </div>
       <div class="event-examples"> <p>
           - when user enters a room, <br>
@@ -105,8 +105,8 @@ export function overrideDialog() {
         <button class="pure-button" id="customDialogEvent">Event</button>
       </p>
       </div>
-      <div class="condition-icon">  <p>  <img src = "../src/img/condition.jpeg"> </p> </div>
-      <div class="condition-desc"> <p> Extended state in a time frame  </p>  </div>
+      <div class="condition-icon">  <p>  <img src = "https://giove.isti.cnr.it/demo/pat/src/img/condition.jpeg"> </p> </div>
+      <div class="condition-desc"> <p> Protracted state in a time frame  </p>  </div>
       <div class="condition-examples">  
       <p>
           - while user is inside a room, <br>

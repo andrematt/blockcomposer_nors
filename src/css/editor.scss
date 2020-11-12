@@ -72,6 +72,24 @@ form {
     width: 100vw;
     max-width: 100vw;
     height: 100%;
+    .rule-list-container{  //rule table
+      display:flex;
+      width:100%;
+      height:50vh;
+      #rule_list {
+        margin-left:5%;
+        //margin-right:auto;
+      }
+    }
+    #modal-footer-buttons-container {
+      display: grid;
+      grid-template-columns: 3fr 1fr;
+      grid-template-rows: 1fr;
+      grid-column-gap: 0px;
+      grid-row-gap: 0px;
+      #modal-footer-left-buttons { grid-area: 1 / 1 / 2 / 2; }
+      #modal-footer-right-buttons { grid-area: 1 / 2 / 2 / 3; } 
+      }
   }
 }
 
@@ -267,9 +285,11 @@ input:focus {
       }
       #textarea-alerts {
         font-size:1.1em;
-        color: #D70202;
         width: 90%;
         margin: auto;
+        .warning{
+        color: #D70202;
+        }
       }
       #textarea-connections-check {
         font-size:1.1em;

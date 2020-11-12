@@ -40,7 +40,7 @@ Blockly.Blocks['event'] = {
 			"args0": [
 				{
 					"type": "field_image",
-					"src": "../src/img/event.jpeg",
+					"src": "https://giove.isti.cnr.it/demo/pat/src/img/event.jpeg",
 					"width": 25,
 					"height": 25,
 					"alt": "*",
@@ -64,7 +64,7 @@ Blockly.Blocks['condition'] = {
 			"args0": [
 				{
 					"type": "field_image",
-					"src": "../src/img/condition.jpeg",
+					"src": "https://giove.isti.cnr.it/demo/pat/src/img/condition.jpeg",
 					"width": 25,
 					"height": 25,
 					"alt": "*",
@@ -74,7 +74,7 @@ Blockly.Blocks['condition'] = {
 			"output": "Number",
 			//"previousStatement" : null,	 
 			"colour": "#065699",
-			"tooltip": "Extended state in a time frame",
+			"tooltip": "Protracted state in a time frame",
 			"helpUrl": ""
 		});
 		this.setMovable(false);

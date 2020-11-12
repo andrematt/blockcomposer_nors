@@ -40,9 +40,9 @@ Blockly.Blocks['not_dynamic'] = {
     this.blockType = "not_dynamic";
     this.appendDummyInput()
       .appendField("Negation is applied to this block");
-    this.appendDummyInput()
-    //  .appendField("(Optional) when: ")
-    //  .appendField(checkbox, 'when_input');
+    this.appendDummyInput() //remove these 2 field to have a "static" not behaviour (without "when")
+      .appendField("(Optional) when: ")
+      .appendField(checkbox, 'when_input');
 
     this.setPreviousStatement(true);
     this.setColour(210);

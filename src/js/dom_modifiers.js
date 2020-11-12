@@ -190,6 +190,9 @@ export async function appendRulesList(domElement) {
     let ruleName = document.createElement('th');
     ruleName.innerText = "Rule name";
 
+    //let ruleGoal = document.createElement('th');
+    //ruleGoal.innerText = "Goal";
+
     let triggers = document.createElement('th');
     triggers.innerText = "Used triggers";
 
@@ -201,6 +204,7 @@ export async function appendRulesList(domElement) {
 
     firstRow.appendChild(userName);
     firstRow.appendChild(ruleName);
+    //firstRow.appendChild(ruleGoal);
     firstRow.appendChild(triggers);
     firstRow.appendChild(actions);
     firstRow.appendChild(active);
@@ -221,6 +225,9 @@ export async function appendRulesList(domElement) {
       let ruleName = document.createElement('td');
       ruleName.innerText = e.rule_name;
 
+     // let ruleGoal = document.createElement('td');
+     // ruleGoal.innerText = e.rule_goal;
+      
       let triggers = document.createElement('td');
       triggers.innerText = e.triggers_str;
 
@@ -228,11 +235,12 @@ export async function appendRulesList(domElement) {
       actions.innerText = e.actions_str;
 
       let active = document.createElement('td');
-      active.innerText = e.isActive;
-      //const triggers = document.createElement('td').innerText = e.triggers_str;
-      //const actions = document.createElement('td').innerText = e.actions_str;
+      active.innerText = "no";
+      //active.innerText = e.isActive;
+      
       el.appendChild(userName);
       el.appendChild(ruleName);
+      //el.appendChild(ruleGoal);
       el.appendChild(triggers);
       el.appendChild(actions);
       el.appendChild(active);

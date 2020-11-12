@@ -200,7 +200,7 @@ export function printError(child, parent){
         message = " Warning: action blocks must be placed in the Action section of the rule block!";
     }
     document.getElementById('textarea-alerts').innerHTML = `
-        <i class="fas fa-exclamation-triangle"></i>${message}
+        <i class="fas warning fa-exclamation-triangle"></i>${message}
     `
     ;
 }

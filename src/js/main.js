@@ -235,6 +235,21 @@ let recommendationType = "Step by step recommendations";
     block.setTooltip(block.timingDesc);
 
     if (leafData.realName === "alarmText") {
+      if (block.timingDesc === "immediate action") {
+        block.appendDummyInput("ACTION_TIMING_ICON")
+        .appendField("immediate action")
+          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/immediate_resized.png", 25, 25, { alt: "immediate action", flipRtl: "FALSE" }));
+      }
+      else if (block.timingDesc === "extended action") {
+        block.appendDummyInput("ACTION_TIMING_ICON")
+        .appendField("extended action")
+          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/extended_resized.png", 25, 25, { alt: "extended action", flipRtl: "FALSE" }));
+      }
+      else if (block.timingDesc === "sustained action") {
+        block.appendDummyInput("ACTION_TIMING_ICON")
+        .appendField("sustained action")
+          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/sustained_resized.png", 25, 25, { alt: "sustained action", flipRtl: "FALSE" }));
+      }
       block.appendDummyInput("TEXT")
         .appendField("Text:")
         .appendField(new Blockly.FieldTextInput("alarm text"), "ALARM_TEXT");
@@ -250,6 +265,21 @@ let recommendationType = "Step by step recommendations";
     }
 
     else if (leafData.realName === "reminderText") {
+      if (block.timingDesc === "immediate action") {
+        block.appendDummyInput("ACTION_TIMING_ICON")
+          .appendField("immediate action")
+          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/immediate_resized.png", 25, 25, { alt: "immediate action", flipRtl: "FALSE" }));
+      }
+      else if (block.timingDesc === "extended action") {
+        block.appendDummyInput("ACTION_TIMING_ICON")
+          .appendField("extended action")
+          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/extended_resized.png", 25, 25, { alt: "extended action", flipRtl: "FALSE" }));
+      }
+      else if (block.timingDesc === "sustained action") {
+        block.appendDummyInput("ACTION_TIMING_ICON")
+          .appendField("sustained action")
+          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/sustained_resized.png", 25, 25, { alt: "sustained action", flipRtl: "FALSE" }));
+      }
       block.appendDummyInput("TEXT")
         .appendField("Text:")
         .appendField(new Blockly.FieldTextInput("reminder text"), "REMINDER_TEXT");
@@ -262,23 +292,6 @@ let recommendationType = "Step by step recommendations";
       block.appendDummyInput("SEND")
         .appendField("Send to:")
         .appendField(new Blockly.FieldTextInput("send to"), "SEND_TO");
-    }
-    else if (leafData.realName === "videoPath") {
-      block.appendDummyInput("VIDEO_PATH_INPUT")
-        .appendField("Video path: ")
-        .appendField(new Blockly.FieldTextInput("path"), "INPUT_FIELD_VALUE");
-      block.appendDummyInput("VIDEO_DURATION_INPUT")
-        .appendField("Duration (min): ")
-        .appendField(new Blockly.FieldNumber(1, 1, 300), "SELECT_FIELD_VALUE");
-
-    }
-    else if (leafData.realName === "imagePath") {
-      block.appendDummyInput("IMAGE_PATH_INPUT")
-        .appendField("Image path: ")
-        .appendField(new Blockly.FieldTextInput("path"), "INPUT_FIELD_VALUE");
-      block.appendDummyInput("IMAGE_DURATION_INPUT")
-        .appendField("Duration (min): ")
-        .appendField(new Blockly.FieldNumber(1, 1, 300), "SELECT_FIELD_VALUE");
     }
   }
   /**
@@ -314,8 +327,21 @@ let recommendationType = "Step by step recommendations";
     block.setTooltip(block.timingDesc);
     block.setHelpUrl('');
 
-
-
+    if (block.timingDesc === "immediate action") {
+      block.appendDummyInput("ACTION_TIMING_ICON")
+          .appendField("immediate action")
+        .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/immediate_resized.png", 25, 25, { alt: "immediate action", flipRtl: "FALSE" }));
+    }
+    else if (block.timingDesc === "extended action") {
+      block.appendDummyInput("ACTION_TIMING_ICON")
+          .appendField("extended action")
+        .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/extended_resized.png", 25, 25, { alt: "extended action", flipRtl: "FALSE" }));
+    }
+    else if (block.timingDesc === "sustained action") {
+      block.appendDummyInput("ACTION_TIMING_ICON")
+          .appendField("sustained action")
+        .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/sustained_resized.png", 25, 25, { alt: "sustained action", flipRtl: "FALSE" }));
+    }
     if (leafData.possibleValues) {
 
       let valuesArray = [];
@@ -375,9 +401,6 @@ let recommendationType = "Step by step recommendations";
         .appendField(new Blockly.FieldNumber(1, 1, 300), "SELECT_FIELD_VALUE");
 
     }
-
-
-
   }
 
   /**
@@ -1252,72 +1275,6 @@ function createTriggerBlocksFromSuggested(bestSuggestion) {
             parentBlock[0].appendChild(valueInput);
           }
 
-          // Eliminati i blocchi day e time, questi if non servono più
-          /*
-          else if (bestSuggestion[i].dest === "hour_min") {
-
-            let startTime = doc.createElement("block");
-            startTime.setAttribute("type", "hour_min");
-            let endTime = doc.createElement("block");
-            endTime.setAttribute("type", "hour_min");
-            // Eliminati i blocchi day e time, questi if non servono più
-            if (bestSuggestion[i].source === "not_dynamic") {
-              let field = doc.createElement("field");
-              field.setAttribute("name", "when_input");
-              field.innerHTML = "TRUE";
-              let mutation = doc.createElement("mutation");
-              mutation.setAttribute("when_input", "true");
-              parentBlock[0].appendChild(mutation);
-              parentBlock[0].appendChild(field);
-
-              let startTimeInput = doc.createElement("value");
-              startTimeInput.setAttribute("name", "when_input_start_hour");
-
-              startTimeInput.appendChild(startTime);
-              parentBlock[0].appendChild(startTimeInput);
-
-              let endTimeInput = doc.createElement("value");
-              endTimeInput.setAttribute("name", "when_input_end_hour");
-
-              endTimeInput.appendChild(endTime);
-              parentBlock[0].appendChild(endTimeInput);
-            }
-            // Eliminati i blocchi day e time, questi if non servono più
-            else if (bestSuggestion[i].source === "dateTime-localTime") {
-              //TODO
-            }
-
-
-          }
-          // Eliminati i blocchi day e time, questi if non servono più
-          else if (bestSuggestion[i].dest === "day") {
-            
-            let day = doc.createElement("block");
-            day.setAttribute("type", "day");
-
-            if (bestSuggestion[i].source === "not_dynamic") {
-              let field = doc.createElement("field");
-              field.setAttribute("name", "when_input");
-              field.innerHTML = "TRUE";
-              let mutation = doc.createElement("mutation");
-              mutation.setAttribute("when_input", "true");
-              parentBlock[0].appendChild(mutation);
-              parentBlock[0].appendChild(field);
-              //TODO: test
-
-
-              let dayInput = doc.createElement("value");
-              dayInput.setAttribute("name", "when_input_day");
-
-              dayInput.appendChild(dayInput);
-              parentBlock[0].appendChild(dayInput);
-            }
-            // Eliminati i blocchi day e time, questi if non servono più
-            else if (bestSuggestion[i].source === "dateTime-localTime") {
-              //TODO
-            }
-          }
-          */
           else {
             let next = doc.createElement("next");
             next.appendChild(triggerNewBlock);
@@ -2396,22 +2353,22 @@ export async function exportAllRules() {
   "use strict";
   let user = getUserName();
   let allRulesForAnUser = await DB.getAllFromDBUserFullData(user).then();
- /* 
-  let pretty = "";
-  allRulesForAnUser.forEach((e) => {
-    pretty += e.rule_obj_str;
-    pretty += "\n\n\n\n";
-  });
-  let blob = new Blob([pretty], { type: "json;charset=utf-8" });
-  saveAs(blob "myRules.json");
-  */
- let allRulesObjs = [];
+  /* 
+   let pretty = "";
+   allRulesForAnUser.forEach((e) => {
+     pretty += e.rule_obj_str;
+     pretty += "\n\n\n\n";
+   });
+   let blob = new Blob([pretty], { type: "json;charset=utf-8" });
+   saveAs(blob "myRules.json");
+   */
+  let allRulesObjs = [];
   allRulesForAnUser.forEach((e) => {
     let rule = JSON.parse(e.rule_obj_str);
     allRulesObjs.push(rule);
   });
- let dataStr = JSON.stringify(allRulesObjs);
- let dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+  let dataStr = JSON.stringify(allRulesObjs);
+  let dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
   saveAs(dataUri, "myRules.json");
 }
 /**
@@ -2927,7 +2884,7 @@ export function getRuleBlock(workspace = getWorkspace()) { //ES6 default params
  * Check that the trigger sequence does not contains events in "and" without 
  * any condition
  */
-function checkEventsWithoutCondition(){
+function checkEventsWithoutCondition() {
   return;
   let workspace = getWorkspace();
   let ruleBlock = getRuleBlock(workspace);
