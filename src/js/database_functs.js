@@ -1,6 +1,7 @@
 import { getUserName, getWorkspace, getTriggerInfo, getHighlightedRule, 
          createRuleBlocksObj, createRuleBlocksStr, getTriggerWithMyCategory,
-         getActionInfo, getTriggerWithNoNextConnection, getRuleSequence
+         getActionInfo, getTriggerWithNoNextConnection, getRuleSequence,
+         returnTriggerType
         } from "./main.js";
 import {generateElementAttributeTable} from "./block_suggestor.js";
 import {printPassedError} from "./textarea_manager.js";
@@ -693,7 +694,7 @@ function createTriggerArr(_rule) {
     if (_rule.blocks[block].isTrigger || _rule.blocks[block].isTriggerArray) {
       let trigger = {};
       //  console.log(_rule.blocks[block]);
-      trigger.triggerType = _rule.blocks[block].childBlocks_[0].type; 
+      trigger.triggerType = returnTriggerType(_rule.blocks[block]); 
       trigger.type = _rule.blocks[block].type; 
       trigger.blockId = _rule.blocks[block].id;
       trigger.dimension = _rule.blocks[block].dimension;
@@ -1067,7 +1068,7 @@ function getActionMode(_rule) {
 export function createTriggerFromSingleBlock(block){
       let trigger = {};
       //  console.log(_rule.blocks[block]);
-      trigger.triggerType = block.childBlocks_[0].type; // TODO controlla che vada sempre bene
+      trigger.triggerType = returnTriggerType(block); 
       trigger.type = block.type;
       trigger.blockId = block.id;
       trigger.dimension = block.dimension;

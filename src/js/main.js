@@ -235,36 +235,7 @@ let recommendationType = "Step by step recommendations";
     block.setTooltip(block.timingDesc);
 
     if (leafData.realName === "alarmText") {
-      if (block.timingDesc === "immediate action") {
-        block.appendDummyInput("ACTION_TIMING_ICON")
-        .appendField("immediate action")
-          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/immediate_resized.png", 25, 25, { alt: "immediate action", flipRtl: "FALSE" }));
-      }
-      else if (block.timingDesc === "extended action") {
-        block.appendDummyInput("ACTION_TIMING_ICON")
-        .appendField("extended action")
-          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/extended_resized.png", 25, 25, { alt: "extended action", flipRtl: "FALSE" }));
-      }
-      else if (block.timingDesc === "sustained action") {
-        block.appendDummyInput("ACTION_TIMING_ICON")
-        .appendField("sustained action")
-          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/sustained_resized.png", 25, 25, { alt: "sustained action", flipRtl: "FALSE" }));
-      }
-      block.appendDummyInput("TEXT")
-        .appendField("Text:")
-        .appendField(new Blockly.FieldTextInput("alarm text"), "ALARM_TEXT");
-      block.appendDummyInput("NOTIFICATION")
-        .appendField("Notification mode:")
-        .appendField(new Blockly.FieldDropdown([["sms", "SMS"], ["email", "EMAIL"], ["notification", "NOTIFICATION"]]), "NOTIFICATION_MODE");
-      block.appendDummyInput("TIMES")
-        .appendField("Send times:")
-        .appendField(new Blockly.FieldDropdown([["1", "ONCE"], ["2", "TWO_TIMES"], ["3", "THREE_TIMES"]]), "REPETITIONS");
-      block.appendDummyInput("SEND")
-        .appendField("Send to:")
-        .appendField(new Blockly.FieldTextInput("send to"), "SEND_TO");
-    }
-
-    else if (leafData.realName === "reminderText") {
+      /* better remove this for the test
       if (block.timingDesc === "immediate action") {
         block.appendDummyInput("ACTION_TIMING_ICON")
           .appendField("immediate action")
@@ -280,6 +251,39 @@ let recommendationType = "Step by step recommendations";
           .appendField("sustained action")
           .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/sustained_resized.png", 25, 25, { alt: "sustained action", flipRtl: "FALSE" }));
       }
+      */
+      block.appendDummyInput("TEXT")
+        .appendField("Text:")
+        .appendField(new Blockly.FieldTextInput("alarm text"), "ALARM_TEXT");
+      block.appendDummyInput("NOTIFICATION")
+        .appendField("Notification mode:")
+        .appendField(new Blockly.FieldDropdown([["sms", "SMS"], ["email", "EMAIL"], ["notification", "NOTIFICATION"]]), "NOTIFICATION_MODE");
+      block.appendDummyInput("TIMES")
+        .appendField("Send times:")
+        .appendField(new Blockly.FieldDropdown([["1", "ONCE"], ["2", "TWO_TIMES"], ["3", "THREE_TIMES"]]), "REPETITIONS");
+      block.appendDummyInput("SEND")
+        .appendField("Send to:")
+        .appendField(new Blockly.FieldTextInput("send to"), "SEND_TO");
+    }
+
+    else if (leafData.realName === "reminderText") {
+      /*
+      if (block.timingDesc === "immediate action") {
+        block.appendDummyInput("ACTION_TIMING_ICON")
+          .appendField("immediate action")
+          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/immediate_resized.png", 25, 25, { alt: "immediate action", flipRtl: "FALSE" }));
+      }
+      else if (block.timingDesc === "extended action") {
+        block.appendDummyInput("ACTION_TIMING_ICON")
+          .appendField("extended action")
+          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/extended_resized.png", 25, 25, { alt: "extended action", flipRtl: "FALSE" }));
+      }
+      else if (block.timingDesc === "sustained action") {
+        block.appendDummyInput("ACTION_TIMING_ICON")
+          .appendField("sustained action")
+          .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/sustained_resized.png", 25, 25, { alt: "sustained action", flipRtl: "FALSE" }));
+      }
+      */
       block.appendDummyInput("TEXT")
         .appendField("Text:")
         .appendField(new Blockly.FieldTextInput("reminder text"), "REMINDER_TEXT");
@@ -326,22 +330,23 @@ let recommendationType = "Step by step recommendations";
     block.setNextStatement(true, null);
     block.setTooltip(block.timingDesc);
     block.setHelpUrl('');
-
+    /*
     if (block.timingDesc === "immediate action") {
       block.appendDummyInput("ACTION_TIMING_ICON")
-          .appendField("immediate action")
+        .appendField("immediate action")
         .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/immediate_resized.png", 25, 25, { alt: "immediate action", flipRtl: "FALSE" }));
     }
     else if (block.timingDesc === "extended action") {
       block.appendDummyInput("ACTION_TIMING_ICON")
-          .appendField("extended action")
+        .appendField("extended action")
         .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/extended_resized.png", 25, 25, { alt: "extended action", flipRtl: "FALSE" }));
     }
     else if (block.timingDesc === "sustained action") {
       block.appendDummyInput("ACTION_TIMING_ICON")
-          .appendField("sustained action")
+        .appendField("sustained action")
         .appendField(new Blockly.FieldImage("https://giove.isti.cnr.it/demo/pat/src/img/sustained_resized.png", 25, 25, { alt: "sustained action", flipRtl: "FALSE" }));
     }
+    */
     if (leafData.possibleValues) {
 
       let valuesArray = [];
@@ -1141,25 +1146,15 @@ let recommendationType = "Step by step recommendations";
       scrollbars: true
     });
 
-  // iniezione dei blocchi iniziali
-  //console.log(document.getElementById('startBlocks'));
+  // Initial block injection
   Blockly.Xml.domToWorkspace(document.getElementById('startBlocks'),
     workspace);
 
-
-  // Registrazione delle estenzioni: non più usate         
-  //Blockly.Extensions.register('add_time_on_not', Extensions.add_time_on_not);
-  //Blockly.Extensions.register('create_refersTo_field', Extensions.create_refersTo_field);
-  //Blockly.Extensions.register('fill_refersTo_field', Extensions.fill_refersTo_field);
-
-  // Registrazione dei listeners
-  //workspace.addChangeListener(Listeners.triggerTypeListenerParent);
+  // Listeners registration
 
   // Main workspace listeners 
 
-  // listeners to place blocks selected from toolbox on the correct position 
-  // in the workspace. Works if the blocks are clicked, but if they are dragged 
-  // crashes. Don't know how to fix this.
+  workspace.addChangeListener(Listeners.addedEventToWorkspace);
   workspace.addChangeListener(Listeners.addedTriggerToWorkspace);
   workspace.addChangeListener(Listeners.addedActionToWorkspace);
   workspace.addChangeListener(Listeners.addedTriggerOpToWorkspace);
@@ -1180,6 +1175,8 @@ let recommendationType = "Step by step recommendations";
   workspace.addChangeListener(Listeners.ruleTypeListener);
   workspace.addChangeListener(Listeners.removeUnusedNotBlocks);
   workspace.addChangeListener(Listeners.autoCheckRule);
+  //workspace.addChangeListener(Listeners.triggerTypeListenerParent); //listener for enable the auto placing of the 
+  //selected block from toolbox. Works if clicked, crash if dragged
 
   //suggestion workspace listeners
   suggestionWorkspace.addChangeListener(Listeners.secondaryWorkspaceLeftClick);
@@ -1479,6 +1476,8 @@ function getSortedBlocks(blocks, triggerInfo = getTriggerInfo(), actionInfo = ge
   let elements = {
     triggers: concatTriggers,
     actions: concatActions,
+    triggersWithId: concatTriggersWithId,
+    actionsWithId: concatActionsWithId,
     elements: concatElements,
     elementsWithId: concatElementsWithId
   }
@@ -2984,6 +2983,23 @@ function isEventCondition(block) {
 }
 
 /**
+ * returns true if the block has an event or condition type child block
+ * @param {*} block 
+ */
+function hasEventConditionChild(block) {
+  if (!block) {
+    return false;
+  }
+  for(let i =0; i<block.childBlocks_.length; i++){
+    console.log(block.childBlocks_[i])
+    if (block.childBlocks_[i].type === "event" || block.childBlocks_[i].type === "condition"){
+      return true;
+    }
+  };
+  return false;
+}
+
+/**
  * 
  * @param {*} block 
  */
@@ -2993,7 +3009,7 @@ function checkTriggerSequenceConsistancy(block) {
   if (checkInTriggerInfo(block)) {
     let isTrigger = checkInTriggerInfo(block);
     if (isTrigger) {
-      if (!isEventCondition(block.childBlocks_[0])) {
+      if (!hasEventConditionChild(block)) {
         inconsistentTriggerMessage = "Trigger must have a type (event or condition) defined";
         inconsistentTriggerSequence = true;
       }
@@ -3646,6 +3662,9 @@ export function removeUnusedInputsFromSecondaryWorkspace() {
   //DomModifiers.alignBlocks();
 }
 
+/**
+ * 
+ */
 export function eventChange() {
   let blockId = getClickedEventConditionBlock();
   let workspace = getWorkspace();
@@ -3659,6 +3678,9 @@ export function eventChange() {
   ModalManager.modalEventConditionChangeClose();
 }
 
+/**
+ * 
+ */
 export function conditionChange() {
   let blockId = getClickedEventConditionBlock();
   let workspace = getWorkspace();
@@ -3672,7 +3694,6 @@ export function conditionChange() {
   ModalManager.modalEventConditionChangeClose();
 }
 
-
 /**
  * 
  */
@@ -3683,7 +3704,87 @@ export function getClickedEventConditionBlock() {
 
 /**
  * 
+ * @param {*} blockId 
  */
 export function setClickedEventConditionBlock(blockId) {
   clickedEventConditionBlock = blockId;
+}
+
+/**
+ * Show the "event and event" modal if two events are connected in "AND". Check 
+ * only the last inserted block with the previous one. 
+ * @param {*} block 
+ */
+export function checkEventEventOnlyPrev(block) {
+  let workspace = getWorkspace();
+  let ruleSequence = getRuleSequence();
+  let triggersWithId = ruleSequence.triggersWithId;
+  if (triggersWithId.length > 1) {
+    let previousLast = triggersWithId[triggersWithId.length - 2];
+    let previousLastBlock = workspace.getBlockById(previousLast.id);
+    if (checkIfEventInChild(previousLastBlock)) {
+      let nextOp = previousLastBlock.getNextBlock();
+      if (nextOp && nextOp.type === "and") {
+        MicroModal.show("modal-event-event");
+      }
+    }
+  }
+}
+
+
+/**
+ * Show the "event and event" modal if two events are connected in "AND". Check 
+ * all the rule sequence.
+ * @param {*} block 
+ */
+export function checkEventEvent(block) {
+  let workspace = getWorkspace();
+  let ruleSequence = getRuleSequence();
+  let triggersWithId = ruleSequence.triggersWithId;
+  if (triggersWithId.length > 1) {
+    for (let i = 0; i < triggersWithId.length; i++) {
+      let actualBlockId = triggersWithId[i].id;
+      let actualBlock = workspace.getBlockById(actualBlockId);
+      if (checkIfEventInChilds(actualBlock)) {
+        let nextOp = actualBlock.getNextBlock();
+        if (nextOp && nextOp.type === "and") {
+          let nextBlock = nextOp.getNextBlock();
+          if (nextBlock && checkIfEventInChilds(nextBlock)) {
+            MicroModal.show("modal-event-event");
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * 
+ * @param {*} block 
+ */
+function checkIfEventInChilds(block){
+  for(let i =0; i<block.childBlocks_.length; i++){
+    console.log(block.childBlocks_[i])
+    if (block.childBlocks_[i].type === "event"){
+      return true;
+    }
+  };
+  return false;
+}
+
+
+/**
+ * Check the position of the trigger type child block (it can be moved, due 
+ * to the possibility of changing the trigger type) 
+ * @param {*} block 
+ */
+export function returnTriggerType(block){
+  for(let i =0; i<block.childBlocks_.length; i++){
+    console.log(block.childBlocks_[i])
+    if (block.childBlocks_[i].type === "event" || block.childBlocks_[i].type === "condition"){
+      return block.childBlocks_[i].type;
+    }
+  };
+  return false;
 }

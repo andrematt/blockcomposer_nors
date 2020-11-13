@@ -8,7 +8,7 @@ import {
   extractChildRecursive, getRuleBlocksArr, cleanRuleBlocksArr,
   ruleSuggestorManager, getSuggestionWorkspace, checkInTriggerOperators,
   checkInActionOperators, setRuleSequence, getRuleSequence,
-  removeToInputsFromEventTime, setClickedEventConditionBlock
+  removeToInputsFromEventTime, setClickedEventConditionBlock, checkEventEvent, returnTriggerType
 } from "./main.js";
 
 import {
@@ -21,6 +21,19 @@ import { getBlockDesc } from "./block_descriptions.js";
 import { checkConnection } from "./connections_checks.js";
 
 import { modalEventConditionChangeShow } from "./modal_manager.js";
+
+export function addedEventToWorkspace(event){
+  "use strict";
+  let workspace = getWorkspace();
+  if (event.type && event.type === 'create') {
+    let block = workspace.blockDB_[event.blockId];
+    if (block) {
+      if (block.type==="event") {
+        checkEventEvent(block);
+      }
+    }
+  }
+}
 
 /**
  * when a block is deleted, update the rule sequence
@@ -334,7 +347,6 @@ export function eventListenerForTimeTrigger(event) {
     //let blockType = getBlockType(block);
     if (block) {
       if (block.parentBlock_) {
-
         if (block.type === "event") {
           let isTrigger = checkInTriggerInfo(block.parentBlock_);
           if (isTrigger) {
@@ -369,12 +381,8 @@ export function triggerTypeListenerChild(event) {
           let isTrigger = checkInTriggerInfo(block.parentBlock_);
           if (isTrigger) {
             block.parentBlock_.getField("EVENT_CONDITION").setText("becomes");
-            if (block.parentBlock_.name === "Time") { //TODO: move this in a separate listener
-              let parent = block.getParent();
-
-            }
-          }
         }
+      }
 
         else if (block.type === "condition") {
           if (block.parentBlock_) {
@@ -390,8 +398,8 @@ export function triggerTypeListenerChild(event) {
       else {
         let triggers = getAllTriggerInWorkspace();
         if (triggers.length > 0) {
-          triggers.forEach(function (e) {
-            if (!e.childBlocks_[0]) {
+          triggers.forEach(function (e) { // reset the "EVENT_CONDITION" field if the block has no event or condition set
+            if (returnTriggerType(e)=== "false") {
               e.getField("EVENT_CONDITION").setText("");
             }
           });
