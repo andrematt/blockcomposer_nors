@@ -1905,7 +1905,7 @@ async function fireFullDataRec(lastBlock, blockType, sequence, linkType) {
  */
 function checkIfRuleEnd(list) {
   for (let i = 0; i < list.length; i++) {
-    if (list[0].label === "none") {
+    if (list[i].label === "none") {
       errorMessages.oftenRuleEnds();
       break;
     }
@@ -1966,9 +1966,9 @@ function filterIncompatible(list, check, linkType) {
     });
     return filtered;
   }
-  else if (linkType === "or" || linkType === "and") {
+  else if (linkType === "sequential" || linkType === "parallel") {
     let filtered = list.filter((e) => {
-      return checkInActionInfoOnlyName(e.label);
+      return e.label === "none" || checkInActionInfoOnlyName(e.label);
     });
     return filtered;
   }
