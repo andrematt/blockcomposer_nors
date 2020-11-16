@@ -765,7 +765,7 @@ let recommendationType = "Step by step recommendations";
     }
 
     else if (leafData.type === "DATE") {
-      block.appendDummyInput()
+      block.appendDummyInput("DATE")
         .appendField(new Blockly.FieldDate());
       block.appendDummyInput()
         .appendField(" NOT: ")

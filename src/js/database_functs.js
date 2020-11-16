@@ -555,8 +555,20 @@ function getTriggerValue(actualBlock){
     return (actualBlock.getFieldValue("TRIGGER_VALUE"));
   }
   // trigger di tipo time, può avere start e/o end
-  else if (actualBlock.getField("START_TIME")) {
+  else if (actualBlock.getInput("START_TIME_HOUR")) {
     let result = {};
+    let startTimeHourInput = actualBlock.getInput("START_TIME_HOUR");
+    let startTimeMinInput = actualBlock.getInput("START_TIME_MIN");
+    let startTime = startTimeHourInput.fieldRow[0].text_ + ":" + startTimeMinInput.fieldRow[0].text_;
+    result.startTime = startTime;
+    if(actualBlock.getInput("END_TIME_HOUR")){ //time as conditon have also an "end" time
+      let endTimeHourInput = actualBlock.getInput("END_TIME_HOUR");
+      let endTimeMinInput = actualBlock.getInput("END_TIME_MIN");
+      let endTime = endTimeHourInput.fieldRow[0].text_ + ":" + endTimeMinInput.fieldRow[0].text_;
+      result.endTime = endTime;
+    }
+    return result; 
+   /* 
     let connection_start = actualBlock.getInput("START_TIME").connection;
     let connectedBlock_start = connection_start.targetBlock();
     if (connectedBlock_start && connectedBlock_start.type === "hour_min") {
@@ -572,13 +584,17 @@ function getTriggerValue(actualBlock){
       result.endTime = endTimeHour + ":" + endTimeMin;
     }
     return result;
+    */
   }
   //trigger di tipo date
   else if (actualBlock.getInput("DATE")) {
-    let blockConnectedToDay = actualBlock.getInput("DATE").connection.targetBlock();
-    if (blockConnectedToDay && blockConnectedToDay.type === "day") {
-      return blockConnectedToDay.inputList[0].fieldRow[0].date_;
-    }
+    let inputDate = actualBlock.getInput("DATE");
+    console.log(inputDate);
+    return inputDate.fieldRow[0].text_;
+    //let blockConnectedToDay = actualBlock.getInput("DATE").connection.targetBlock();
+    //if (blockConnectedToDay && blockConnectedToDay.type === "day") {
+      //return blockConnectedToDay.inputList[0].fieldRow[0].date_;
+   // }
   }
 }
 
