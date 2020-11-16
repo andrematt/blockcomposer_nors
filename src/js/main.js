@@ -62,6 +62,7 @@ const triggerTimeBlocks = ["day", "hour_min"];
 const actionSupportBlocks = ["parallel_dynamic", "action_placeholder", "sequential", "parallel"];
 let revertPossibility = "remove";
 let recommendationType = "Step by step recommendations";
+let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
 
 /**
  * Modulo di inizializzazione, pattern IIFE. Carica trigger e azioni, 
@@ -644,16 +645,10 @@ let recommendationType = "Step by step recommendations";
       //.appendField("taken", "MEDICINE_TAKEN");
     }
 
-    if (leafData.realName === "rain") {
+    if (findInBooleanTriggers(leafData.realName)){
       block.appendDummyInput()
         .appendField("True")
-    }
-
-    if (leafData.realName === "snow") {
-      block.appendDummyInput()
-        .appendField("True")
-    }
-
+    };
 
     if (leafData.possibleValues) {
       let valuesArray = [];
@@ -3822,4 +3817,12 @@ function checkActionSequenceConsistancy(block) {
       }
     };
     return false;
+  }
+
+  /**
+   * Helper function
+   * @param {*} name 
+   */
+  function findInBooleanTriggers(triggerRealName){
+    return booleanTriggers.includes(triggerRealName) ? true : false;
   }
