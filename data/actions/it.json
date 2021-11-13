@@ -1,0 +1,400 @@
+[{
+    "displayedName": "Luci",
+    "englishDisplayedName": "Appliances",
+    "realName": "ChangeApplianceState",
+    "description": "Change the state of appliances",
+    "configuration": "mutually-exlusive",
+    "attributes": [],
+    "type": "update",
+    "nodes": [{
+            "displayedName": "Tutte",
+            "englishDisplayedName": "All",
+            "realName": "all",
+            "description": "All Appliances",
+            "nodes": [],
+            "attributes": [{
+            	"displayedName": "Tutte le luci",
+                "englishDisplayedName": "All light",
+                "realName": "AllLight",
+                "description": "All Lights in the house",
+                "possibleValues": ["ON", "OFF"],
+                "xPath": "applianceState/all/allLight",
+                "type": "invokeFunctions:changeApplianceState"
+             }, {
+            	"displayedName" : "Luce bioritmo",   
+            	"englishDisplayedName": "Biorhythm Light",
+            	"realName": "BiorhythmLight",
+            	"description": "Start Biorhythm Light Scene",            
+            	"xPath": "applianceState/all/@scene",
+            	"type": "invokeFunctions:lightScene"
+       	     }, {
+       	    	"displayedName": "Luce attivante",
+            	"englishDisplayedName": "Activating Light",
+            	"realName": "ActivatingLight",
+            	"description": "Start Activating Light Scene",            
+            	"xPath": "applianceState/all/@scene",
+            	"type": "invokeFunctions:lightScene"
+        	 }, {
+        		"displayedName": "Luce rilassante",	
+            	"englishDisplayedName": "Relaxing Light",
+            	"realName": "RelaxingLight",
+            	"description": "Start Relaxing Light Scene",            
+            	"xPath": "applianceState/all/@scene",
+            	"type": "invokeFunctions:lightScene"
+        	}]
+        },{
+            "displayedName": "Cucina",
+            "englishDisplayedName": "Kitchen",
+            "realName": "Kitchen",
+            "description": "Cucina",
+            "nodes": [],
+            "attributes": [{
+                    "displayedName": "Tutte le luci",
+                    "englishDisplayedName": "All light",
+                    "realName": "AllLight",
+                    "description": "All Lights in the kitchen",
+                    "possibleValues": ["ON", "OFF"],
+                    "xPath": "applianceState/Kitchen/allLight",
+                    "type": "invokeFunctions:changeApplianceState"
+                },{
+                    "displayedName": "Luce colorata cucina",
+                    "englishDisplayedName": "Color light Kitchen",
+                    "realName": "Hue color light Kitchen",
+                    "description": "Kitchen Light",
+                    "xPath": "applianceState/Kitchen/lightColor",
+                    "type": "update:lightColor"
+                },{
+          		  "displayedName": "Luce bioritmo",
+          		  "englishDisplayedName" : "BiorhythmLight",
+	              "realName": "BiorhythmLight",
+                  "description": "Start Biorhythm Light Scene in the Kitchen",            
+                  "xPath": "applianceState/Kitchen/@scene",
+           		  "type": "invokeFunctions:lightScene"
+       		   }, {
+        	      "displayedName": "Luce attivante",
+                  "englishDisplayedName": "Activating Light",
+                  "realName": "Activate",
+                  "description": "Start Activating Light Scene in the Kitchen",            
+                  "xPath": "applianceState/Kitchen/@scene",
+                  "type": "invokeFunctions:lightScene"
+        	   }, {
+        		 "displayedName": "Luce rilassante",
+                 "englishDisplayedName": "Relaxing Light",
+                 "realName": "Relax",
+                 "description": "Start Relaxing Light Scene in the Kitchen",            
+                 "xPath": "applianceState/Kitchen/@scene",
+                 "type": "invokeFunctions:lightScene"
+              }]
+        },
+        {
+            "displayedName": "Soggiorno",
+            "englishDisplayedName": "Living Room",
+            "realName": "LivingRoom",
+            "description": "Soggiorno",
+            "nodes": [],
+            "attributes": [{
+                	"displayedName": "Tutte le luci",
+                    "englishDisplayedName": "All light",
+                    "realName": "AllLight",
+                    "description": "All Lights in the living room",
+                    "possibleValues": ["ON", "OFF"],
+                    "xPath": "applianceState/LivingRoom/allLight",
+                    "type": "invokeFunctions:changeApplianceState"
+                },
+                {
+                    "displayedName": "Luce colorata soggiorno",
+                    "englishDisplayedName": "Color light Living Room",
+                    "realName": "Hue color light Living Room",
+                    "description": "Luce soggiorno",
+                    "xPath": "applianceState/LivingRoom/lightColor",
+                    "type": "update:lightColor"
+                }, 
+                {
+                	"displayedName": "Luce GREAT",
+           			"englishDisplayedName": "GREAT Luminare",
+            		"realName": "GREATLuminare",
+            		"description": "GREAT Luminare Light",
+            		"xPath": "applianceState/LivingRoom/greatLuminare",
+            		"type": "custom:greatLuminare"
+        		}, {
+          		   "displayedName": "Luce bioritmo",
+          		   "englishDisplayedName" : "BiorhythmLight",
+	               "realName": "BiorhythmLight",
+                   "description": "Start Biorhythm Light Scene in the Living Room",            
+                   "xPath": "applianceState/LivingRoom/@scene",
+           		   "type": "invokeFunctions:lightScene"
+        		}, {
+        			"displayedName": "Luce attivante",
+                	"englishDisplayedName": "Activating Light",
+            		"realName": "Activate",
+            		"description": "Start Activating Light Scene in the Living Room",            
+            		"xPath": "applianceState/LivingRoom/@scene",
+            		"type": "invokeFunctions:lightScene"
+        		}, {
+        			"displayedName": "Luce rilassante",
+            		"englishDisplayedName": "Relaxing Light",
+            		"realName": "Relax",
+            		"description": "Start Relaxing Light Scene in the Living Room",            
+            		"xPath": "applianceState/LivingRoom/@scene",
+            		"type": "invokeFunctions:lightScene"
+        		}	
+            ]
+        },{
+            "displayedName": "Ingresso",
+            "englishDisplayedName": "Entrance",
+            "realName": "Entrance",
+            "description": "Entrance",
+            "nodes": [],
+            "attributes": [{
+                    "displayedName": "Tutte le luci",
+                    "englishDisplayedName": "All light",
+                    "realName": "AllLight",
+                    "description": "All Lights in the entrance",
+                    "possibleValues": ["ON", "OFF"],
+                    "xPath": "applianceState/Entrance/allLight",
+                    "type": "invokeFunctions:changeApplianceState"
+                },
+                {
+                    "displayedName": "Luce colorata ingresso",
+                    "englishDisplayedName": "Color light Entrance",
+                    "realName": "color light Entrance",
+                    "description": "Entrance Light",
+                    "xPath": "applianceState/Entrance/lightColor",
+                    "type": "update:lightColor"
+                },
+                {
+          		   "displayedName": "Luce bioritmo",
+          		   "englishDisplayedName" : "BiorhythmLight",
+	               "realName": "BiorhythmLight",
+                   "description": "Start Biorhythm Light Scene in the Entrance",            
+                   "xPath": "applianceState/Entrance/@scene",
+           		   "type": "invokeFunctions:lightScene"
+        		}, {
+        			"displayedName": "Luce attivante",
+                	"englishDisplayedName": "Activating Light",
+            		"realName": "Activate",
+            		"description": "Start Activating Light Scene in the Entrance",            
+            		"xPath": "applianceState/Entrance/@scene",
+            		"type": "invokeFunctions:lightScene"
+        		}, {
+        			"displayedName": "Luce rilassante",
+            		"englishDisplayedName": "Relaxing Light",
+            		"realName": "Relax",
+            		"description": "Start Relaxing Light Scene in the Entrance",            
+            		"xPath": "applianceState/Entrance/@scene",
+            		"type": "invokeFunctions:lightScene"
+        		}	
+            ]
+        }, 
+        {
+            "displayedName": "Corridoio",
+            "realName": "Corridor",
+            "description": "Corridoio",
+            "nodes": [],
+            "attributes": [{
+                "displayedName": "Tutte le luci",
+                "realName": "AllLight",
+                "description": "All Lights in the corridor",
+                "possibleValues": ["ON", "OFF"],
+                "xPath": "applianceState/Corridor/allLight",
+                "type": "invokeFunctions:changeApplianceState"
+            },{
+                "displayedName": "Striscia Led",
+                "realName": "Light Strip Corridor",
+                "description": "Light Strip Corridor",
+                "xPath": "applianceState/Corridor/lightColor",
+                "type": "update:lightColor"
+            }]
+        },
+		{
+            "displayedName": "Camera da letto",
+            "englishDisplayedName": "Bedroom",
+            "realName": "Bedroom",
+            "description": "Bedroom",
+            "nodes": [],
+            "attributes": [ {
+            	"displayedName": "Tutte le luci",
+                "englishDisplayedName": "All light",
+                "realName": "AllLight",
+                "description": "All Lights in the bedroom",
+				"possibleValues": ["ON", "OFF"],
+                "xPath": "applianceState/Bedroom/allLight",
+                "type": "invokeFunctions:changeApplianceState"
+                },
+                {
+				"displayedName": "Luce colorata Camera da letto",
+                "englishDisplayedName": "Color light Bedroom",
+				"realName": "Hue color light bedroom",
+                "description": "Bedroom Light",
+                "xPath": "applianceState/Bedroom/lightColor",
+                "type": "update:lightColor"
+                },
+                {
+          		   "displayedName": "Luce bioritmo",
+          		   "englishDisplayedName" : "BiorhythmLight",
+	               "realName": "BiorhythmLight",
+                   "description": "Start Biorhythm Light Scene in the Bedroom",            
+                   "xPath": "applianceState/Bedroom/@scene",
+           		   "type": "invokeFunctions:lightScene"
+        		}, {
+        			"displayedName": "Luce attivante",
+                	"englishDisplayedName": "Activating Light",
+            		"realName": "Activate",
+            		"description": "Start Activating Light Scene in the Bedroom",            
+            		"xPath": "applianceState/Bedroom/@scene",
+            		"type": "invokeFunctions:lightScene"
+        		}, {
+        			"displayedName": "Luce rilassante",
+            		"englishDisplayedName": "Relaxing Light",
+            		"realName": "Relax",
+            		"description": "Start Relaxing Light Scene in the Bedroom",            
+            		"xPath": "applianceState/Bedroom/@scene",
+            		"type": "invokeFunctions:lightScene"
+        		}	
+            ]
+        },
+		{
+            "displayedName": "Bagno",
+            "englishDisplayedName": "Bathroom",
+            "realName": "Bathroom",
+            "description": "Bathroom",
+            "nodes": [],
+            "attributes": [{
+                    "displayedName": "Tutte le luci",
+                    "englishDisplayedName": "All light",
+                    "realName": "AllLight",
+                    "description": "All Lights in the bathroom",
+                    "possibleValues": ["ON", "OFF"],
+                    "xPath": "applianceState/Bathroom/allLight",
+                    "type": "invokeFunctions:changeApplianceState"
+                },
+                {
+                    "displayedName": "Luce colorata bagno",
+                    "englishDisplayedName": "Color light Bathroom",
+                    "realName": "color light Bathroom",
+                    "description": "Bathroom Light",
+                    "xPath": "applianceState/Bathroom/lightColor",
+                    "type": "update:lightColor"
+                },
+                 {
+          		   "displayedName": "Luce bioritmo",
+          		   "englishDisplayedName" : "BiorhythmLight",
+	               "realName": "BiorhythmLight",
+                   "description": "Start Biorhythm Light Scene in the Bathroom",            
+                   "xPath": "applianceState/Bathroom/@scene",
+           		   "type": "invokeFunctions:lightScene"
+        		}, {
+        			"displayedName": "Luce attivante",
+                	"englishDisplayedName": "Activating Light",
+            		"realName": "Activate",
+            		"description": "Start Activating Light Scene in the Bathroom",            
+            		"xPath": "applianceState/Bathroom/@scene",
+            		"type": "invokeFunctions:lightScene"
+        		}, {
+        			"displayedName": "Luce rilassante",
+            		"englishDisplayedName": "Relaxing Light",
+            		"realName": "Relax",
+            		"description": "Start Relaxing Light Scene in the Bathroom",            
+            		"xPath": "applianceState/Bathroom/@scene",
+            		"type": "invokeFunctions:lightScene"
+        		}	
+            ]
+        }
+    ]
+}, {
+    "displayedName": "Allarmi",
+    "englishDisplayedName": "Alarms",
+    "realName": "Alarms",
+    "description": "Generation of some alarms",
+    "configuration": "every-item",
+    "type": "function",
+    "nodes": [],
+    "attributes": [
+        {
+            "displayedName": "Testo",
+            "englishDisplayedName": "Text",
+            "realName": "alarmText",
+            "description": "Alarm Text",
+            "type": "custom:string"
+        },
+        {
+            "displayedName": "Notifica",
+            "englishDisplayedName": "Notification Mode",
+            "realName": "notificationMode",
+            "description": "Notification Mode",
+            "possibleValues": ["SMS", "MAIL", "NOTIFICATION", "VOICE"],
+            "type": "custom:notificationMode"
+        },
+        {
+            "displayedName": "Ripetizione",
+            "englishDisplayedName": "Repetition",
+            "realName": "repetition",
+            "description": "How many times alert should be sent",
+            "possibleValues": ["ONCE", "TWICE", "THREE_TIMES"],
+            "type": "custom:repetitionType"
+        },
+        {
+            "displayedName": "Destinatario",
+            "englishDisplayedName": "To",
+            "realName": "alarmRecipient",
+            "description": "Alarm recipient",
+            "type": "custom:string"
+        }
+    ]
+}, {
+    "displayedName": "Promemoria",
+    "englishDisplayedName": "Reminders",
+    "realName": "Reminders",
+    "description": "Send reminders",
+    "configuration": "every-item",
+    "type": "function",
+    "nodes": [],
+    "attributes": [
+        {
+            "displayedName": "Testo",
+            "englishDisplayedName": "Text",
+            "realName": "reminderText",
+            "description": "Reminder Text",
+            "type": "custom:string"
+        },
+        {
+            "displayedName": "Modo",
+            "englishDisplayedName": "Notification Mode",
+            "realName": "notificationMode",
+            "description": "Mode",
+            "possibleValues": ["SMS", "MAIL", "NOTIFICATION", "VOICE"],
+            "type": "custom:notificationMode"
+        },
+        {
+            "displayedName": "Ripetizione",
+            "englishDisplayedName": "Repetition",
+            "realName": "Repetition",
+            "description": "How many times reminder should be sent",
+            "possibleValues": ["ONCE", "TWICE", "3 TIMES"],
+            "type": "custom:repetitionType"
+        },
+        {
+            "displayedName": "Destinatario",
+            "englishDisplayedName": "To",
+            "realName": "reminderRecipient",
+            "description": "Reminder recipient",
+            "type": "custom:string"
+        }
+    ]
+},
+{
+    "displayedName": "Servizi Amazon",
+            "realName": "routineName",
+            "description": "Servizi Amazon",        
+            "nodes": [],
+            "attributes": [{
+                "displayedName": "Avvia Servizio",
+                "realName": "Launch_Service",
+                "description": "Launch Service",
+                "possibleValues": ["News", "Weather", "Music", "Petal Assistant"],
+                "xPath": "amazonAlexa/@routineName",            
+                "type": "invokeFunctions:startRoutine"			
+            }
+        ]
+    }
+]

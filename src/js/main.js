@@ -7,19 +7,21 @@ import * as BlockSuggestor from "./block_suggestor.js";
 import * as Dialog from "./custom_dialog.js";
 import * as DomModifiers from "./dom_modifiers.js";
 import * as errorMessages from "./textarea_manager.js";
-import * as neuralNetwork from "./neural_network.js";
-import * as RS_values from "./rs_values.js";
 import * as ModalManager from "./modal_manager.js"
-import { CPT } from "./CPT/index.js"
+import { getDimIdTable } from "./dimension_ids.js";
 
 /**
  * TODO: 
- * quando cancelli un elemento, se sei in modalità "step-by-step" i bottoni 
- * vengono aggiornati, altrimenti no
- * CONTROLLA IL NOT NELLE RACCOMANDAZIONI FULL
- * removeToInputsFromEventTime dovrebbe essere eseguita anche quando viene 
- * presa una regola dal Db... in futuro
+ * - Adesso i trigger hanno dentificativo dimId # xPath: guarda se fare una 
+ * cosa del genere anche per azioni
+ * - Export di regole in formato TAREME: riparti da createActionArr in 
+ * from_rule_to_rule_obj: la parte trigger adesso dovrebbe essere coerente con 
+ * TAREME, per la parte azione è da vedere:
+ * sicuramente c'è da aggiungere xPath e possibleValues se presenti!!
+ * - La lettura di un ctx generato sembra funzionare, il problema è che mancano 
+ * i dimensionId: viene passato a blockly un blocco con undefined e crasha. 
  */
+
 let currentUser;
 let myTriggers;
 let myActions;
@@ -30,8 +32,8 @@ let triggerBlocks;
 let actionBlocks;
 let ruleSequence;
 let ruleBlocksArr = [];
-let triggerCompleteInfo = [];
-let actionCompleteInfo = [];
+let triggerCompleteInfo = {};
+let actionCompleteInfo = {};
 let triggersXml = "";
 let actionsXml = "";
 let lastBlocklyEvent = "";
@@ -47,7 +49,6 @@ let triggerList = [];
 let actionList = [];
 let clickedEventConditionBlock;
 let lastBlock; // Last block inserted in workspace
-let CPTmodel;
 let ruleSuggestorStatus;
 let triggerInWorkspace = []; // keep the triggers in workspace TODO: listener for remove at delete
 // Array per le azioni composte da più parti ma da mostrare come una unità
@@ -61,7 +62,7 @@ const actionOperators = ["parallel_dynamic", "sequential", "parallel"];
 const triggerTimeBlocks = ["day", "hour_min"];
 const actionSupportBlocks = ["parallel_dynamic", "action_placeholder", "sequential", "parallel"];
 let revertPossibility = "remove";
-let recommendationType = "Step by step recommendations";
+let recommendationType = "None";
 let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
 
 /**
@@ -73,60 +74,34 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
   "use strict";
   console.log(Init);
   //console.log(window.Blockly.Blocks.procedures_callnoreturn.renameProcedure("test", "test2"));
-  initializeCPT();
-  initializeNN();
   localStorageChecker();
   waitForTriggers();
   waitForActions();
   initializeSuggestorButtons();
   initializeSuggestorSelector();
   Dialog.overrideDialog();
-
+  console.log("trigger info loaded!");
+  console.log(getTriggerInfo());
+  console.log("action info loaded!");
+  console.log(getActionInfo()); 
   async function initializeSuggestorButtons() {
     let text = `
- Start the editing of the trigger part selecting a trigger from the toolbox.
+ Start the editing of the rule by selecting a trigger or an action from the toolbox.
     `;
     document.getElementById('textarea-suggestion-expl').innerHTML = "";
     document.getElementById('textarea-suggestion-expl').innerHTML = text;
-    document.getElementById("suggestor-and").onclick = function () { startRefineRule("and") };
-    document.getElementById("suggestor-or").onclick = function () { startRefineRule("or") };
-    document.getElementById("suggestor-not").onclick = function () { startRefineRule("not") };
-    document.getElementById("suggestor-action").onclick = function () { startRefineRule("rule") };
-    document.getElementById("suggestor-sequential").onclick = function () { startRefineRule("sequential") };
-    document.getElementById("suggestor-parallel").onclick = function () { startRefineRule("parallel") };
+    document.getElementById("suggestor-and").onclick = function () { addTextareaOperatorToBlock("and") };
+    document.getElementById("suggestor-or").onclick = function () { addTextareaOperatorToBlock("or") };
+    document.getElementById("suggestor-not").onclick = function () {addTextareaOperatorToBlock("not") };
+    //document.getElementById("suggestor-action").onclick = function () { startRefineRule("rule") };
+    //document.getElementById("suggestor-sequential").onclick = function () { startRefineRule("sequential") };
+    //document.getElementById("suggestor-parallel").onclick = function () { startRefineRule("parallel") };
   }
 
   async function initializeSuggestorSelector() {
     document.getElementById("suggestor-step-by-step").onclick = function () { setRecommendationType("step") };
     document.getElementById("suggestor-full-rule").onclick = function () { setRecommendationType("full") };
     document.getElementById("suggestor-none").onclick = function () { setRecommendationType("none") };
-  }
-
-  /**
-   * select all graphs from DB, convert them back in JS format, train the CPT 
-   * model with them.
-   */
-  async function initializeCPT() {
-    "use strict"
-    let allSequences = await DB.getAllSequencesFromDB().then();
-    console.log(allSequences);
-    CPTmodel = new CPT();
-    let myData = allSequences.map(element => JSON.parse(element.rule_sequence));
-    CPTmodel.train(
-      myData // Training Data
-    );
-  }
-
-  /**
-   * select all the element/attribute row in the elAtt table, train the NN model
-   */
-  async function initializeNN() {
-    "use strict"
-    let allElementAtt = await DB.getAllElementAttFromDB().then();
-    console.log(allElementAtt);
-    let arrayedAllElementAtt = convertElementAttInArr(allElementAtt);
-    console.log(arrayedAllElementAtt);
-    neuralNetwork.train(arrayedAllElementAtt);
   }
 
 
@@ -136,8 +111,13 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
    */
   async function waitForTriggers() {
     myTriggers = await Init.loadTriggersAsync();
-    const triggerWithCategoryData = addCategoryDataToAttributeTrigger(myTriggers);
-    loadTriggersToolboxRecursive(triggerWithCategoryData);
+    console.log(myTriggers);
+    //const triggerWithCategoryData = addCategoryDataToAttributeTrigger(myTriggers);
+    for (let element in myTriggers){
+      addCategoryDataToAttributeTrigger(myTriggers[element])
+    }
+    console.log(myTriggers);
+    loadTriggersToolboxRecursive(myTriggers);
     rebuildToolbox();
     //addTriggersToConnections();
   }
@@ -153,18 +133,60 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
     //addActionsToConnections();
   }
 
+/**
+ * If passedSchema is not an array, add dimensionId if needed, recursive call 
+ * on nodes and attributes. 
+ * Same if is an array. 
+ * @param {*} passedSchema 
+ * @param {*} dimensionId 
+ */
+  function addCategoryDataToAttributeTrigger(passedSchema, dimensionId = false){
+    // for sugli attributi: se ha attributi aggiungi
+    // for sui nodi: se ha nodi chiama ricorsivo
+    if(!passedSchema.dimensionId){
+      passedSchema.dimensionId = dimensionId;
+    }
+      if(passedSchema.nodes) {
+        passedSchema.nodes.forEach( (ee) => {
+          addCategoryDataToAttributeTrigger(ee, passedSchema.dimensionId);
+        })
+      }
+      if(passedSchema.attributes){
+        passedSchema.attributes.forEach( (ee) => {
+          addCategoryDataToAttributeTrigger(ee, passedSchema.dimensionId);
+        })
+    }
+
+    for (let i = 0; i<passedSchema.length; i++){
+      if(!passedSchema[i].dimensionId){
+        passedSchema[i].dimensionId = dimensionId;
+      }
+      if(passedSchema[i].nodes) {
+      passedSchema[i].nodes.forEach( (ee) => {
+        addCategoryDataToAttributeTrigger(ee, passedSchema[i].dimensionId);
+      })
+    }
+    if(passedSchema[i].attributes){
+      passedSchema[i].attributes.forEach( (ee) => {
+        addCategoryDataToAttributeTrigger(ee, passedSchema[i].dimensionId);
+      })
+    }
+  }
+}
+
   /** 
    *  Aggiunge le informazioni della categoria (realName, displayedName, 
    *  dimensionId) agli attributi, per poterli recuperare senza dover guardare 
    *  all'elemento padre.
    */
-  function addCategoryDataToAttributeTrigger(passedSchema) {
+  function addCategoryDataToAttributeTrigger2(passedSchema) {
     let schema = passedSchema;
     for (let element in schema) {
       for (let i = 0; i < schema[element].length; i++) {
         const realName = schema[element][i].realName;
         const displayedName = schema[element][i].displayedName;
         const dimensionId = schema[element][i].dimensionId;
+        console.log(dimensionId);
         if (schema[element][i].attributes !== undefined) {
           for (let j = 0; j < schema[element][i].attributes.length; j++) {
             schema[element][i].attributes[j].categoryRealName = realName;
@@ -258,7 +280,7 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
         .appendField(new Blockly.FieldTextInput("alarm text"), "ALARM_TEXT");
       block.appendDummyInput("NOTIFICATION")
         .appendField("Notification mode:")
-        .appendField(new Blockly.FieldDropdown([["sms", "SMS"], ["email", "EMAIL"], ["notification", "NOTIFICATION"]]), "NOTIFICATION_MODE");
+        .appendField(new Blockly.FieldDropdown([["sms", "SMS"], ["email", "EMAIL"], ["notification", "NOTIFICATION"], ["voice", "VOICE"]]), "NOTIFICATION_MODE");
       block.appendDummyInput("TIMES")
         .appendField("Send times:")
         .appendField(new Blockly.FieldDropdown([["1", "ONCE"], ["2", "TWO_TIMES"], ["3", "THREE_TIMES"]]), "REPETITIONS");
@@ -290,7 +312,7 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
         .appendField(new Blockly.FieldTextInput("reminder text"), "REMINDER_TEXT");
       block.appendDummyInput("NOTIFICATION")
         .appendField("Notification mode:")
-        .appendField(new Blockly.FieldDropdown([["sms", "SMS"], ["email", "EMAIL"], ["notification", "NOTIFICATION"]]), "NOTIFICATION_MODE");
+        .appendField(new Blockly.FieldDropdown([["sms", "SMS"], ["email", "EMAIL"], ["notification", "NOTIFICATION"], ["voice", "VOICE"]]), "NOTIFICATION_MODE");
       block.appendDummyInput("TIMES")
         .appendField("Send times:")
         .appendField(new Blockly.FieldDropdown([["1", "ONCE"], ["2", "TWO_TIMES"], ["3", "THREE_TIMES"]]), "REPETITIONS");
@@ -388,7 +410,7 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
       block.appendDummyInput("OPERATOR")
         //.setCheck(null)
 
-        .appendField(new Blockly.FieldDropdown([["=", "EQUAL"], ["<", "LESSTHEN"], [">", "MORETHEN"]]), "SELECT_FIELD_VALUE")
+        .appendField(new Blockly.FieldDropdown([["uguale a", "EQUAL"], ["diverso da", "DIFFERENT"], ["meno di", "LESSTHEN"], ["più di", "MORETHEN"]]), "SELECT_FIELD_VALUE")
         //.appendField(new Blockly.FieldDropdown([["=", "EQUAL"], ["<", "LESSTHEN"], [">", "MORETHEN"]]), "NAME")
         //block.appendDummyInput("VALUE")
         //.setCheck("Number")
@@ -505,13 +527,14 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
    */
   function createMultipleTrigger(block, passedLeafData, name, parentName, checkbox) {
     const leafData = passedLeafData;
-    Object.freeze(leafData);
+    let xPath = (leafData.xPath ? leafData.xPath : "xPath missing!!");
     block.name = name;
     block.blockType = "trigger";
     block.isTriggerArray = true;
     block.appendValueInput("TRIGGER_TYPE");
     //.appendField("Trigger type:");
-    let dimensionId = "" + leafData.categoryDimensionId;
+    let dimensionId = "" + leafData.dimensionId;
+    //let dimensionId = "" + leafData.categoryDimensionId; // ??????????
 
     block.appendDummyInput("BLOCK_HEADER")
       .appendField(new Blockly.FieldLabel(name, "block-name"))
@@ -585,6 +608,9 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
    */
   function createStandardTrigger(block, passedLeafData, name, parentName, checkbox) {
     const leafData = passedLeafData;
+    //console.log(passedLeafData);
+    
+    let xPath = (leafData.xPath ? leafData.xPath : "xPath missing!!");
     //Object.freeze(leafData);
     //console.log(leafData);
     //console.log(name);
@@ -594,7 +620,14 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
     block.blockType = "trigger";
     block.appendValueInput("TRIGGER_TYPE");
     //.appendField("Trigger type:");
-    let dimensionId = "" + leafData.categoryDimensionId;
+
+
+
+    //let dimensionId = "" + leafData.categoryDimensionId; ???????
+    let dimensionId = "" + leafData.dimensionId; 
+    //console.log(dimensionId);
+
+
 
     block.appendDummyInput("BLOCK_HEADER")
       .appendField(new Blockly.FieldLabel(name, "block-name"))
@@ -645,7 +678,7 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
       //.appendField("taken", "MEDICINE_TAKEN");
     }
 
-    if (findInBooleanTriggers(leafData.realName)){
+    if (findInBooleanTriggers(leafData.realName)) {
       block.appendDummyInput()
         .appendField("True")
     };
@@ -673,7 +706,8 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
       block.appendDummyInput("TRIGGER_INPUT")
         //.setCheck(null)
 
-        .appendField(new Blockly.FieldDropdown([["=", "EQUAL"], ["<", "LESSTHEN"], [">", "MORETHEN"]]), "TRIGGER_OP")
+        .appendField(new Blockly.FieldDropdown([["uguale a", "EQUAL"], ["diverso da", "DIFFERENT"], ["meno di", "LESSTHEN"], ["più di", "MORETHEN"]]), "SELECT_FIELD_VALUE")
+        //.appendField(new Blockly.FieldDropdown([["=", "EQUAL"], ["<", "LESSTHEN"], [">", "MORETHEN"]]), "TRIGGER_OP")
         //block.appendDummyInput("VALUE")
         //.setCheck("Number")
 
@@ -698,8 +732,12 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
 
     else if (leafData.type === "TIME") {
       block.getField("displayed_name").setText("Time between: ");
-      block.appendDummyInput("START_TIME_LABEL")
-        .appendField("start: ")
+      //console.log(leafData);
+      block.appendDummyInput("TIME_OPERATOR")
+        .appendField(new Blockly.FieldDropdown([["uguale a", "EQUAL"], ["diverso da", "DIFFERENT"], ["meno di", "LESSTHEN"], ["più di", "MORETHEN"]]), "SELECT_FIELD_VALUE")
+        //.appendField(new Blockly.FieldDropdown([["equal", "EQUAL"], ["different from", "DIFFERENT"], ["less then", "LESSTHEN"], ["more then", "MORETHEN"], ]), "TRIGGER_OP") //Ok fare così perché non ci sono i possibleValues
+      //block.appendDummyInput("START_TIME_LABEL")
+       // .appendField("start: ")
       block.appendDummyInput("START_TIME_HOUR")
         .appendField(new Blockly.FieldDropdown([["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"],
         ["04", "04"], ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"], ["10", "10"],
@@ -720,29 +758,7 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
         ["55", "55"], ["56", "56"], ["57", "57"], ["58", "58"], ["59", "59"]
         ]), "START_MINS");
 
-      block.appendDummyInput("END_TIME_LABEL")
-        .appendField("end: ");
-      block.appendDummyInput("END_TIME_HOUR")
-        .appendField(new Blockly.FieldDropdown([["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"],
-        ["04", "04"], ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"], ["10", "10"],
-        ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"], ["15", "15"], ["16", "16"], ["17", "17"],
-        ["18", "18"], ["19", "19"], ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"]]), "END_HOURS");
-      block.appendDummyInput("END_TIME_MIN")
-        .appendField(new Blockly.FieldDropdown([["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"], ["04", "04"],
-        ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"],
-        ["10", "10"], ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"],
-        ["15", "15"], ["16", "16"], ["17", "17"], ["18", "18"], ["19", "19"],
-        ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"], ["24", "24"],
-        ["25", "25"], ["26", "26"], ["27", "27"], ["28", "28"], ["29", "29"],
-        ["30", "30"], ["31", "31"], ["32", "32"], ["33", "33"], ["34", "34"],
-        ["35", "35"], ["36", "36"], ["37", "37"], ["38", "38"], ["39", "39"],
-        ["40", "40"], ["41", "41"], ["42", "42"], ["43", "43"], ["44", "44"],
-        ["45", "45"], ["46", "46"], ["47", "47"], ["48", "48"], ["49", "49"],
-        ["50", "50"], ["51", "51"], ["52", "52"], ["53", "53"], ["54", "54"],
-        ["55", "55"], ["56", "56"], ["57", "57"], ["58", "58"], ["59", "59"]
-        ]), "END_MINS");
-
-      block.appendDummyInput()
+      block.appendDummyInput("NOT_INPUT")
         .appendField(" NOT: ")
         .appendField(checkbox, 'not_input');
       /*
@@ -776,6 +792,16 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
     }
   }
 
+
+  function translateDimensionId(dimId){
+    let dimIdTable = getDimIdTable();
+    let catName = dimIdTable[dimId]; 
+    if(catName){
+      return catName.displayedName;
+    }
+    return "";
+  }
+
   /**
    * Crea l'XML di un trigger (nodo foglia), assegna a 
    * Blockly.JavaScript[leafData.realName] il js da chiamare quando viene aggiunto
@@ -785,9 +811,11 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
   function createTriggerDinamically(leafData, blockName) {
     const myLeafData = leafData;
     //Object.freeze(myLeafData);
+    leafData.categoryDisplayedName = translateDimensionId(leafData.dimensionId);
+    //console.log(leafData.categoryDisplayedName);
     Blockly.Blocks[blockName] = {
       init: function () {
-        var checkbox = new Blockly.FieldCheckbox("false", function (pxchecked) {
+        let checkbox = new Blockly.FieldCheckbox("false", function (pxchecked) {
           this.sourceBlock_.updateShape_(pxchecked);
         });
         const elementName = leafData.displayedName;
@@ -802,7 +830,6 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
           createStandardTrigger(this, myLeafData, name, parentName, checkbox);
         }
       },
-
 
       mutationToDom: function () {
         var container = document.createElement('mutation');
@@ -869,11 +896,6 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
     ${actionsXml}
   </category>
   <sep gap = "8"></sep>
-  <category name="Action operators" colour="150">
-    <block type="sequential"></block>
-    <block type="parallel"></block>
-  </category>
-  <sep gap = "8"></sep>
 </xml>
 ` ;
     workspace.updateToolbox(newTree);
@@ -921,10 +943,13 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
               actionList.push(blockName);
               const myInfo = {
                 fullName: blockName,
+                xPath: e.attributes[i].xPath ? e.attributes[i].xPath : "none",
+                type: e.attributes[i].type,
+                possibleValues: e.attributes[i].possibleValues ? e.attributes[i].possibleValues : "none",
                 categoryName: categoryName,
                 realName: e.attributes[i].realName
               };
-              actionCompleteInfo.push(myInfo);
+              actionCompleteInfo[blockName] = myInfo;
               actionsXml += ` 
               <block category="${categoryName}" type="${blockName}"></block>
             `;
@@ -937,10 +962,13 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
                 actionList.push(blockName);
                 const myInfo = {
                   fullName: blockName,
+                xPath: e.attributes[i].xPath ? e.attributes[i].xPath : "none",
+                type: e.attributes[i].type,
+                possibleValues: e.attributes[i].possibleValues ? e.attributes[i].possibleValues : "none",
                   categoryName: categoryName,
                   realName: e.attributes[i].realName
                 };
-                actionCompleteInfo.push(myInfo);
+              actionCompleteInfo[blockName] = myInfo;
                 actionsXml += ` 
                 <block category="${categoryName}" type="${blockName}"></block>
               `;
@@ -987,6 +1015,135 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
   }
 
   /**
+   * 
+   * @param {*} data 
+   */
+  function drawAttribute(data) {
+    //console.log(data);
+    const categoryName = escapeXml(data.englishDisplayedName);
+    const categoryRealName = escapeXml(data.realName);
+    triggersXml += `
+          <category colour="#065699" name="${categoryName}">
+        `;
+    for (let i = 0; i < data.attributes.length; i++) {
+      let blockName = data.attributes[i].dimensionId + "#" + escapeXml(data.attributes[i].xPath);
+      //let blockName = categoryRealName + "-" + escapeXml(data.attributes[i].realName);
+      createTriggerDinamically(data.attributes[i], blockName);
+      //se non fa parte della lista, disegna normalmente tutti gli
+      //attributi come nodi foglia
+      if (multipleTriggers.indexOf(data.realName) === -1) {
+        triggersXml += ` 
+              <block category = "${categoryName}" type="${blockName}" type2="${escapeXml(data.attributes[i].realName)}"></block>
+            `;
+        triggerList.push(blockName);
+        const myInfo = {
+          fullName: blockName,
+          xPath: data.attributes[i].xPath,
+          dimensionId: data.attributes[i].dimensionId,
+          type: data.attributes[i].type,
+          possibleValues: data.attributes[i].type === "ENUM" ? data.attributes[i].possibleValues : "none",
+          categoryName: categoryName,
+          realName: escapeXml(data.attributes[i].realName)
+        };
+        triggerCompleteInfo[blockName] = myInfo;
+        //triggerList.push(data.attributes[i].realName);
+      }
+      //se fa parte della lista, disegna solo il primo attributo
+      else {
+        if (i === 0) {
+          triggersXml += ` 
+                <block category = "${categoryName}" type="${blockName}" type2="${escapeXml(data.attributes[i].realName)}"></block>
+              `;
+          triggerList.push(blockName);
+          const myInfo = {
+            fullName: blockName,
+            xPath: data.attributes[i].xPath,
+            dimensionId: data.attributes[i].dimensionId,
+            type: data.attributes[i].type,
+            possibleValues: data.attributes[i].type === "ENUM" ? data.attributes[i].possibleValues : "none",
+            categoryName: categoryName,
+            realName: escapeXml(data.attributes[i].realName)
+          };
+        triggerCompleteInfo[blockName] = myInfo;
+          //triggerCompleteInfo.push(myInfo);
+          //triggerList.push(data.attributes[i].realName);
+        }
+
+      }
+      //triggersXml += ` 
+      //  <block type="${data.attributes[i].realName}"></block>
+      //`;
+    }
+
+    triggersXml += `
+          </category>
+        `;
+  }
+
+  /**
+   * 
+   * @param {*} data 
+   */
+  function drawAttributeWhenNodesArePresent(data) {
+    for (let i = 0; i < data.attributes.length; i++) {
+
+    const categoryName = escapeXml(data.attributes[i].englishDisplayedName);
+    const categoryRealName = escapeXml(data.attributes[i].realName);
+    triggersXml += `
+          <category colour="#065699" name="${categoryName}">
+        `;
+      let blockName = categoryRealName + "-" + escapeXml(data.attributes[i].realName);
+      createTriggerDinamically(data.attributes[i], blockName);
+      //se non fa parte della lista, disegna normalmente tutti gli
+      //attributi come nodi foglia
+      if (multipleTriggers.indexOf(data.realName) === -1) {
+        triggersXml += ` 
+              <block category = "${categoryName}" type="${blockName}" type2="${escapeXml(data.attributes[i].realName)}"></block>
+            `;
+        triggerList.push(blockName);
+        const myInfo = {
+          fullName: blockName,
+            xPath: data.attributes[i].xPath,
+            dimensionId: data.attributes[i].dimensionId,
+            type: data.attributes[i].type,
+            possibleValues: data.attributes[i].type === "ENUM" ? data.attributes[i].possibleValues : "none",
+          categoryName: categoryName,
+          realName: escapeXml(data.attributes[i].realName)
+        };
+        triggerCompleteInfo[blockName] = myInfo;
+        //triggerList.push(data.attributes[i].realName);
+      }
+      //se fa parte della lista, disegna solo il primo attributo
+      else {
+        if (i === 0) {
+          triggersXml += ` 
+                <block category = "${categoryName}" type="${blockName}" type2="${escapeXml(data.attributes[i].realName)}"></block>
+              `;
+          triggerList.push(blockName);
+          const myInfo = {
+            fullName: blockName,
+            xPath: data.attributes[i].xPath,
+            dimensionId: data.attributes[i].dimensionId,
+            type: data.attributes[i].type,
+            possibleValues: data.attributes[i].type === "ENUM" ? data.attributes[i].possibleValues : "none",
+            categoryName: categoryName,
+            realName: escapeXml(data.attributes[i].realName)
+          };
+        triggerCompleteInfo[blockName] = myInfo;
+          //triggerList.push(data.attributes[i].realName);
+        }
+
+      }
+      //triggersXml += ` 
+    triggersXml += `
+          </category>
+        `;
+      //  <block type="${data.attributes[i].realName}"></block>
+      //`;
+    }
+
+  }
+  /**
    * Crea ricorsivamente l'albero dei trigger
    * @param {*} data 
    * @param {*} xml 
@@ -996,8 +1153,6 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
       xml = ` `;
 
     }
-
-
     if (!Array.isArray(data)) {
       if (data.englishDisplayedName === undefined) {
         //top level category
@@ -1010,6 +1165,20 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
             </category>
           `;
         }
+      }
+      // a "mixed" category. 
+      else if (data.nodes !== undefined && data.attributes !== undefined) {
+        console.log("MIX");
+        console.log(data);
+         triggersXml += `
+           <category colour="#065699" name="${escapeXml(data.englishDisplayedName)}">
+         `;
+ 
+         drawAttributeWhenNodesArePresent(data);
+         loadTriggersToolboxRecursive(data.nodes, xml);
+         triggersXml += `
+           </category>
+         `;
       }
       else if (data.nodes !== undefined) {
         //middle level category
@@ -1024,64 +1193,14 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
       }
       else if (data.attributes !== undefined) {
         //terminal leaf     
-        const categoryName = escapeXml(data.englishDisplayedName);
-        const categoryRealName = escapeXml(data.realName);
-        triggersXml += `
-          <category colour="#065699" name="${categoryName}">
-        `;
-        for (let i = 0; i < data.attributes.length; i++) {
-          let blockName = categoryRealName + "-" + escapeXml(data.attributes[i].realName);
-          createTriggerDinamically(data.attributes[i], blockName);
-          //se non fa parte della lista, disegna normalmente tutti gli
-          //attributi come nodi foglia
-          if (multipleTriggers.indexOf(data.realName) === -1) {
-            triggersXml += ` 
-              <block category = "${categoryName}" type="${blockName}" type2="${escapeXml(data.attributes[i].realName)}"></block>
-            `;
-            triggerList.push(blockName);
-            const myInfo = {
-              fullName: blockName,
-              categoryName: categoryName,
-              realName: escapeXml(data.attributes[i].realName)
-            };
-            triggerCompleteInfo.push(myInfo);
-            //triggerList.push(data.attributes[i].realName);
-          }
-          //se fa parte della lista, disegna solo il primo attributo
-          else {
-            if (i === 0) {
-              triggersXml += ` 
-                <block category = "${categoryName}" type="${blockName}" type2="${escapeXml(data.attributes[i].realName)}"></block>
-              `;
-              triggerList.push(blockName);
-              const myInfo = {
-                fullName: blockName,
-                categoryName: categoryName,
-                realName: escapeXml(data.attributes[i].realName)
-              };
-              triggerCompleteInfo.push(myInfo);
-              //triggerList.push(data.attributes[i].realName);
-            }
-
-          }
-          //triggersXml += ` 
-          //  <block type="${data.attributes[i].realName}"></block>
-          //`;
-        }
-
-        triggersXml += `
-          </category>
-        `;
+        drawAttribute(data);
       }
-      //xml += passedXml;  
-
     }
     else {
       data.forEach(function (e) { //chiama ricorsivamente su ogni elemento dell'array
         loadTriggersToolboxRecursive(e, xml);
       });
     }
-    //return xml;
   }
 
 
@@ -1148,27 +1267,34 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
   // Listeners registration
 
   // Main workspace listeners 
-
-  workspace.addChangeListener(Listeners.addedEventToWorkspace);
+  // Listeners that manage the text suggestions in the lower part of the screen 
+  workspace.addChangeListener(Listeners.addedEventToWorkspace); // Used to check if the "event-event" condition is verified
   workspace.addChangeListener(Listeners.addedTriggerToWorkspace);
   workspace.addChangeListener(Listeners.addedActionToWorkspace);
+  workspace.addChangeListener(Listeners.addedNegationToWorkspace);
   workspace.addChangeListener(Listeners.addedTriggerOpToWorkspace);
   workspace.addChangeListener(Listeners.addedActionOpToWorkspace);
-  workspace.addChangeListener(Listeners.eventListenerForTimeTrigger);
+
   workspace.addChangeListener(Listeners.addedBlockToWorkspace);
   workspace.addChangeListener(Listeners.removedBlockFromWorkspace);
-  workspace.addChangeListener(Listeners.lastTriggerActionListener);
-  workspace.addChangeListener(Listeners.notBlockUpdate);
+
+  // Listeners that manage the creation and the click on  blocks, to show/hide the available operators for that block
+  // nly done for triggers. 
+  workspace.addChangeListener(Listeners.toolboxListenerLeftClick);
+  workspace.addChangeListener(Listeners.toolboxListenerCreated);
+
+  // Other misc listeners
+  workspace.addChangeListener(Listeners.notBlockUpdate); // Adds the "not" block
+  workspace.addChangeListener(Listeners.removeUnusedNotBlocks); //remove the "not" block
   workspace.addChangeListener(Listeners.triggerTypeListenerChild);
   workspace.addChangeListener(Listeners.blockDisconnectListener);
   workspace.addChangeListener(Listeners.triggerListener);
   workspace.addChangeListener(Listeners.eventConditionBlocksLeftClick);
   workspace.addChangeListener(Listeners.parallelBranchesUpdateNumber);
-  workspace.addChangeListener(Listeners.waitToParallelListener);
+  //workspace.addChangeListener(Listeners.waitToParallelListener);
   workspace.addChangeListener(Listeners.updateCodeListener);
   //  workspace.addChangeListener(Listeners.blockDocsListener);
   workspace.addChangeListener(Listeners.ruleTypeListener);
-  workspace.addChangeListener(Listeners.removeUnusedNotBlocks);
   workspace.addChangeListener(Listeners.autoCheckRule);
   //workspace.addChangeListener(Listeners.triggerTypeListenerParent); //listener for enable the auto placing of the 
   //selected block from toolbox. Works if clicked, crash if dragged
@@ -1180,201 +1306,11 @@ let booleanTriggers = ["rain", "snow", "motion", "gasSensor", "smokeSensor"];
   mySuggestionWorkspace = suggestionWorkspace;
 })();
 
-
-/**
- * Costruisce la regola in formato blocco a partire dalla lista di suggerimenti
- * @param {*} bestSuggestion 
- */
-function createTriggerBlocksFromSuggested(bestSuggestion) {
-  "use strict";
-  console.log("suggestion list:");
-  console.log(bestSuggestion);
-  let workspace = getSuggestionWorkspace();
-
-  // crea elemento dom xml e struttura della regola
-  var doc = document.implementation.createDocument("", "", null);
-  let ruleTest = doc.createElement("block");
-  ruleTest.setAttribute("class", "rule");
-
-  for (let i = 0; i < bestSuggestion.length; i++) {
-    let prev = function () {
-      if (i === 0) {
-        return undefined;
-      }
-      return bestSuggestion[i - 1];
-    }();
-    //console.log("prev: ", prev);
-    if (prev) {
-      if (bestSuggestion[i].source !== prev.source) {
-        //se il blocco precedente è di tipo group devi creare sia il blocco
-        //associato al campo "source" che quello al campo "dest"
-        if (prev.source === "group") {
-          // TODO
-        } else if (bestSuggestion[i].dest === "hour_min") {
-          let parentBlock = doc.getElementsByClassName(prev.dest);
-          console.log(parentBlock[0]);
-          let field = doc.createElement("field");
-          field.setAttribute("name", "when_input");
-          field.innerHTML = "TRUE";
-          let mutation = doc.createElement("mutation");
-          mutation.setAttribute("when_input", "true");
-          parentBlock[0].appendChild(mutation);
-          parentBlock[0].appendChild(field);
-          /*
-          TODO: come fargli selezionare la check?
-          let fieldStart = doc.createElement("field");
-          fieldStart.setAttribute("name", "when_input_start_hour");
-          fieldStart.innerHTML = "TRUE";
-
-          let mutationStart = doc.createElement("mutation");
-          mutationStart.setAttribute("when_input_start_hour", "true");
-
-          let fieldEnd = doc.createElement("field");
-          fieldEnd.setAttribute("name", "when_input_end_hour");
-          fieldEnd.innerHTML = "TRUE";
-
-          let mutationEnd = doc.createElement("mutation");
-          mutationEnd.setAttribute("when_input_end_hour", "true");
-
-          parentBlock[0].appendChild(mutationStart);
-          parentBlock[0].appendChild(fieldStart);
-          parentBlock[0].appendChild(mutationEnd);
-          parentBlock[0].appendChild(fieldEnd);
-          */
-
-        }
-        else if (bestSuggestion[i].dest === "day") {
-          let parentBlock = doc.getElementsByClassName(prev.dest);
-          let field = doc.createElement("field");
-          field.setAttribute("name", "when_input");
-          field.innerHTML = "TRUE";
-          let mutation = doc.createElement("mutation");
-          mutation.setAttribute("when_input", "true");
-          parentBlock[0].appendChild(mutation);
-          parentBlock[0].appendChild(field);
-        }
-        else {
-          let parentBlock = doc.getElementsByClassName(prev.dest);
-          let triggerNewBlock = doc.createElement("block");
-          triggerNewBlock.setAttribute("type", bestSuggestion[i].dest);
-          triggerNewBlock.setAttribute("class", bestSuggestion[i].dest);
-          if (BlockSuggestor.isEventCondition(bestSuggestion[i])) {
-            let valueInput = doc.createElement("value");
-            valueInput.setAttribute("name", "TRIGGER_TYPE");
-            let triggerTypeBlock = doc.createElement("block");
-            triggerTypeBlock.setAttribute("type", bestSuggestion[i].dest);
-            valueInput.appendChild(triggerTypeBlock);
-            parentBlock[0].appendChild(valueInput);
-          }
-
-          else {
-            let next = doc.createElement("next");
-            next.appendChild(triggerNewBlock);
-            parentBlock[0].appendChild(next);
-          }
-        }
-      }
-      else {
-        if (BlockSuggestor.isEventCondition(bestSuggestion[i])) {
-          let valueInput = doc.createElement("value");
-          valueInput.setAttribute("name", "TRIGGER_TYPE");
-          let triggerTypeBlock = doc.createElement("block");
-          triggerTypeBlock.setAttribute("type", bestSuggestion[i].dest);
-          valueInput.appendChild(triggerTypeBlock);
-        }
-        else if (bestSuggestion[i].dest === "not_dynamic") {
-          let parentBlock = doc.getElementsByClassName(prev.source);
-          let statementInput = doc.createElement("statement");
-          let mutation = doc.createElement("mutation");
-          let field = doc.createElement("field");
-          field.setAttribute("name", "not_input");
-          field.innerHTML = "TRUE";
-          mutation.setAttribute("not_input", "true");
-          statementInput.setAttribute("name", "not_input_statement");
-          let triggerTypeBlock = doc.createElement("block");
-          triggerTypeBlock.setAttribute("type", bestSuggestion[i].dest);
-          triggerTypeBlock.setAttribute("class", bestSuggestion[i].dest);
-          statementInput.appendChild(triggerTypeBlock);
-          parentBlock[0].appendChild(mutation);
-          parentBlock[0].appendChild(field);
-          parentBlock[0].appendChild(statementInput);
-          //console.log(doc);
-        }
-        /*
-        else if (bestSuggestion[i].dest === "hour_min") {
-
-          let startTime = doc.createElement("block");
-          startTime.setAttribute("type", "hour_min");
-          let endTime = doc.createElement("block");
-          endTime.setAttribute("type", "hour_min");
-
-
-          let parentBlock = doc.getElementsByClassName(prev.source);
-          let startTimeInput = doc.createElement("value");
-          startTimeInput.setAttribute("name", "START_TIME");
-
-          startTimeInput.appendChild(startTime);
-          parentBlock[0].appendChild(startTimeInput);
-
-          let endTimeInput = doc.createElement("value");
-          endTimeInput.setAttribute("name", "END_TIME");
-
-          endTimeInput.appendChild(endTime);
-          parentBlock[0].appendChild(endTimeInput);
-
-        }
-        else if (bestSuggestion[i].dest === "day") {
-          let parentBlock = doc.getElementsByClassName(prev.source);
-          //TODO
-        }
-        */
-        else {
-          console.log("continuazione di un path");
-          console.log("doc:", doc);
-          console.log("prev.source:", prev.source);
-          //se non sono di tipo relative pos
-          let parentBlock = doc.getElementsByClassName(prev.source);
-          console.log(parentBlock);
-          let next = doc.createElement("next");
-          let newTriggerBlock = doc.createElement("block");
-          newTriggerBlock.setAttribute("type", bestSuggestion[i].dest);
-          newTriggerBlock.setAttribute("class", bestSuggestion[i].dest);
-          next.appendChild(newTriggerBlock);
-          // posso usare la classe come identificativo perchè per ogni path c'è 
-          // solo un blocco per tipo (i path vengono creati rimuovendo i blocchi)
-          parentBlock[0].appendChild(next);
-        }
-      }
-    }
-    //primo elemento
-    else {
-      let block = doc.createElement("block");
-      block.setAttribute("class", bestSuggestion[i].source);
-      block.setAttribute("type", bestSuggestion[i].source);
-      //aggiungi elementi per event/condition
-      if (BlockSuggestor.isEventCondition(bestSuggestion[i])) {
-        let valueInput = doc.createElement("value");
-        valueInput.setAttribute("name", "TRIGGER_TYPE");
-        let triggerTypeBlock = doc.createElement("block");
-        triggerTypeBlock.setAttribute("type", bestSuggestion[i].dest);
-        valueInput.appendChild(triggerTypeBlock);
-        block.appendChild(valueInput);
-      }
-      // append al blocco rule
-      doc.appendChild(block);
-    }
-  }
-  console.log(doc);
-  var xmlText = new XMLSerializer().serializeToString(doc);
-  return (xmlText);
-  //Blockly.Xml.appendDomToWorkspace(doc, workspace);
-}
-
 /**
  * Restituisce il primo elemento inserito nel blocco regola se è un trigger, 
  * altrimenti non resituisce nulla
  */
-function getFirstTrigger() {
+export function getFirstTrigger() {
   //query selector per prendere il primo blocco rule
   let rule_xml = Blockly.Xml.workspaceToDom(myWorkspace, false);
   let triggersContainer = rule_xml.getAttribute("TRIGGERS");
@@ -1382,11 +1318,14 @@ function getFirstTrigger() {
   const triggerInfo = getTriggerInfo();
   if (allStatements[0] && typeof allStatements[0].children !== "undefined") {
     let type = allStatements[0].children[0].getAttribute("type");
+    let singleEntry = triggerInfo[type];
+    /* now triggerInfo is an obj
     let singleEntry = triggerInfo.find((o, i) => {
       if (o.fullName === type) {
         return o;
       }
     });
+    */
     if (singleEntry) {
       return singleEntry.fullName;
     }
@@ -1420,21 +1359,27 @@ function getSortedBlocks(blocks, triggerInfo = getTriggerInfo(), actionInfo = ge
   }
   for (let i = 0; i < ruleBlockIndex; i++) {
     let type = blocks[i].type;
+    let triggerEntry = triggerInfo[type];
+    /* //now triggerInfo is an obj
     let triggerEntry = triggerInfo.find((o, i) => {
       if (o.fullName === type) {
         return o;
       }
     });
+    */
     if (triggerEntry) {
       pulledOutTriggers.push(triggerEntry.fullName);
       pulledOutTriggersWithId.push({ name: triggerEntry.fullName, id: blocks[i].id });
       continue;
     }
+    let actionEntry = actionInfo[type];
+    /* // now actionInfo is an obj
     let actionEntry = actionInfo.find((o, i) => {
       if (o.fullName === type) {
         return o;
       }
     });
+    */
     if (actionEntry) {
       pulledOutActions.push(actionEntry.fullName);
       pulledOutActionsWithId.push({ name: actionEntry.fullName, id: blocks[i].id });
@@ -1442,21 +1387,27 @@ function getSortedBlocks(blocks, triggerInfo = getTriggerInfo(), actionInfo = ge
   }
   for (let i = ruleBlockIndex; i < blocks.length; i++) {
     let type = blocks[i].type;
+    let triggerEntry = triggerInfo[type];
+    /* // now triggerInfo is a obj
     let triggerEntry = triggerInfo.find((o, i) => {
       if (o.fullName === type) {
         return o;
       }
     });
+      */
     if (triggerEntry) {
       triggers.push(triggerEntry.fullName);
       triggersWithId.push({ name: triggerEntry.fullName, id: blocks[i].id });
       continue;
     }
+    let actionEntry = actionInfo[type];
+    /* // now actionInfo is an obj
     let actionEntry = actionInfo.find((o, i) => {
       if (o.fullName === type) {
         return o;
       }
     });
+    */
     if (actionEntry) {
       actions.push(actionEntry.fullName);
       actionsWithId.push({ name: actionEntry.fullName, id: blocks[i].id });
@@ -1525,9 +1476,60 @@ export function resetLastBlock() {
 }
 
 /**
+ * Updates the block and the XML of a trigger, when the negation is added via 
+ * textbox 
+ * @param {*} block 
+ */
+export function addNegationToBlock(block){
+  console.log("ADD NEGATION TO BLOCK")
+  let xml = blockToDom(block); //when updating a block "from the outside" (not using listeners..), you need to update
+  xml.setAttribute('not_input', true); //also the xml of the block
+  block.domToMutation(xml);
+  let inputField = block.getField("not_input");
+  inputField.setValue(true);
+  block.render();
+}
+
+/**
+ * 
+ * @param {*} block 
+ * @param {*} operator 
+ */
+export function addOperatorToBlock(block, operator){
+  let workspace = getWorkspace();
+  let blockToAppend = workspace.newBlock(operator);
+  blockToAppend.initSvg();
+  blockToAppend.render();
+  let blockConnection = block.nextConnection;
+  let otherConnection = blockToAppend.previousConnection;
+  blockConnection.connect(otherConnection);
+}
+
+/**
+ * Funcitions linked to the textarea buttons. Adds the clicked button to the last
+ * inserted / clicked block.  
+ * @param {*} type 
+ */
+export function addTextareaOperatorToBlock(linkType){
+    let lastBlock = getLastBlock();
+
+    if (linkType === "and") {
+        console.log("AND")
+        addOperatorToBlock(lastBlock, linkType)
+      }
+      else if (linkType === "or") {
+        addOperatorToBlock(lastBlock, linkType)
+      }
+      else if (linkType === "not") {
+        addNegationToBlock(lastBlock);
+      }
+}     
+
+/**
  * 
  * @param {*} linkType 
  */
+/*
 export function startRefineRule(linkType) {
   let lastBlock = getLastBlock();
   console.log(lastBlock);
@@ -1535,41 +1537,34 @@ export function startRefineRule(linkType) {
     console.log("AND")
     DomModifiers.addOperatorToBlock(lastBlock, linkType)
     //errorMessages.cleanTextAreaExplainations(); //which textarea?
-    ruleSuggestorManager(lastBlock, true, linkType);
+    //ruleSuggestorManager(lastBlock, true, linkType);
   }
   else if (linkType === "or") {
     DomModifiers.addOperatorToBlock(lastBlock, linkType)
     //errorMessages.cleanTextAreaExplainations();
-    ruleSuggestorManager(lastBlock, true, linkType);
+    //ruleSuggestorManager(lastBlock, true, linkType);
   }
   else if (linkType === "not") {
     DomModifiers.addNegationToBlock(lastBlock);
     //errorMessages.afterNotMessage();
-    ruleSuggestorManager(lastBlock, true, linkType);
+    //ruleSuggestorManager(lastBlock, true, linkType);
   }
   else if (linkType === "rule") {
     errorMessages.startActionEditing();
-    ruleSuggestorManager(lastBlock, true, linkType);
+    //ruleSuggestorManager(lastBlock, true, linkType);
   }
   else if (linkType === "sequential") {
     DomModifiers.addOperatorToBlock(lastBlock, linkType)
     //errorMessages.cleanTextAreaExplainations();
-    ruleSuggestorManager(lastBlock, true, linkType);
+    //ruleSuggestorManager(lastBlock, true, linkType);
   }
   else if (linkType === "parallel") {
     DomModifiers.addOperatorToBlock(lastBlock, linkType)
     //errorMessages.cleanTextAreaExplainations();
-    ruleSuggestorManager(lastBlock, true, linkType);
+    //ruleSuggestorManager(lastBlock, true, linkType);
   }
 }
-
-/**
- * We will fire recommendation each time. Eventually, add checks here.  
- * @param {*} block 
- */
-function checkRecommendationConditions(block) {
-  return true;
-}
+*/
 
 /**
  * 
@@ -1583,6 +1578,7 @@ export function getRuleSuggestorStatus() {
  * refined (CPT + Neural network) suggestion on the last rule element (trigger 
  * or action) inserted.  
  */
+/*
 export async function ruleSuggestorManager(lastBlock = getLastBlock(), refined = false, linkType) {
   console.log("RULE SUGGESTOR MANAGER");
   console.log(lastBlock.type);
@@ -1595,22 +1591,25 @@ export async function ruleSuggestorManager(lastBlock = getLastBlock(), refined =
   if (recommendationType === "Step by step recommendations") {
     if (checkRecommendationConditions(lastBlock)) {
       if (refined && checkInTriggerInfoWithName(lastBlock.type)) {
-        await fireFullDataRec(lastBlock, "trigger", elementsInWorkspace.elements, linkType).then();
+        await BlockSuggestor.fireFullDataRec(lastBlock, "trigger", elementsInWorkspace.elements, linkType).then();
         textareaMessagesManager(lastBlock, linkType, "full");
         ruleSuggestorStatus = "full";
       }
       else if (refined && checkInActionInfoOnlyName(lastBlock.type)) {
-        await fireFullDataRec(lastBlock, "action", elementsInWorkspace.elements, linkType).then();
+        await BlockSuggestor.fireFullDataRec(lastBlock, "action", elementsInWorkspace.elements, linkType).then();
         textareaMessagesManager(lastBlock, linkType, "full");
         ruleSuggestorStatus = "full";
       }
+      //fireOnlySequenceRec does not returns anything, but instead call the 
+      //functs to modify the dom. A better pattern would be return the results
+      //here, and then call the dom modifiers
       else if (checkInTriggerInfoWithName(lastBlock.type)) {
-        fireOnlySequenceRec(elementsInWorkspace.elements, "trigger", lastBlock);
+        BlockSuggestor.fireOnlySequenceRec(elementsInWorkspace.elements, "trigger", lastBlock);
         textareaMessagesManager(lastBlock, linkType, "onlySeq");
         ruleSuggestorStatus = "seq";
       }
       else if (checkInActionInfoOnlyName(lastBlock.type)) {
-        fireOnlySequenceRec(elementsInWorkspace.elements, "action", lastBlock);
+        BlockSuggestor.fireOnlySequenceRec(elementsInWorkspace.elements, "action", lastBlock);
         textareaMessagesManager(lastBlock, linkType, "onlySeq");
         ruleSuggestorStatus = "seq";
       }
@@ -1620,7 +1619,7 @@ export async function ruleSuggestorManager(lastBlock = getLastBlock(), refined =
     }
   }
   else if (recommendationType === "Full rule recommendations") {
-    let topRecs = await fireRecommendationForFullRule(elementsInWorkspace.elements, lastBlock).then();
+    let topRecs = await BlockSuggestor.fireRecommendationForFullRule(elementsInWorkspace.elements, lastBlock).then();
     console.log("TOP Recs!!");
     console.log(topRecs);
     if (refined) {
@@ -1664,130 +1663,7 @@ export async function ruleSuggestorManager(lastBlock = getLastBlock(), refined =
     }
   }
 }
-
-/**
- * Obtain the 5 top recommendations via CPT, add each of them to the already 
- * inserted sequence. Then, foreeach new sequence obtained, loops on each rule 
- * saved in the database, to check the one that best fits the new sequence.  
- * Then, this top5 rules is filter to remove duplicate rules and returned. 
- * @param {*} sequence 
- */
-async function fireRecommendationForFullRule(sequence, lastBlock) {
-  let CPTpredictions = obtainSequenceRec(sequence, RS_values.getPreviousElementToConsider_CPT(), 5);
-  console.log(CPTpredictions);
-  let CPTpredictionsCheck = [];
-  //Obtain a list of sequences with added the rule element obtained with CPT
-  if (CPTpredictions[0] && CPTpredictions[0].length > 0) { //horrible error handling
-    CPTpredictionsCheck = CPTpredictions[0];
-    errorMessages.cleanTextAreaAlerts();
-  }
-  if (CPTpredictionsCheck.length === 0) { //if no results, only fire CPT for the last inserted element
-    let CPTpredictions = obtainSequenceRec([lastBlock.type], RS_values.getPreviousElementToConsider_CPT(), 5);
-    if (CPTpredictions[0] && CPTpredictions[0].length > 0) { //horrible error handling
-      CPTpredictionsCheck = CPTpredictions[0];
-      errorMessages.cleanTextAreaAlerts();
-    }
-    else {
-      errorMessages.suggestorErrorMessages("noSuggestions");
-      return;
-    }
-  }
-  // create 5 sequence comprised by the element inserted by the user and the 
-  // top cpt suggestions
-  let sequenceWithCPTresults = [];
-  for (let i = 0; i < CPTpredictionsCheck.length; i++) {
-    let actualElement = [...sequence];
-    actualElement.push(CPTpredictionsCheck[i][0]);
-    sequenceWithCPTresults.push(actualElement);
-  }
-  console.log(sequenceWithCPTresults);
-  //get all rules from DB 
-  let allSequences = await DB.getAllSequencesFromDB().then();
-  console.log(allSequences);
-  allSequences.map((e) => {
-    e.rule_sequence = JSON.parse(e.rule_sequence);
-  });
-  console.log(allSequences);
-  //aggiungi ad ogni rule (allSequence) lo score ottenuto
-  //fai sort per score e restituisci prime 5 lo score ottenuto
-  // Alternative method, does not work
-  /*
-    for (let i = 0; i<allSequences.length; i++){
-      let score = 0;
-      let setA = new Set(allSequences[i].rule_sequence);
-      for(let j = 0; j < sequenceWithCPTresults.length; j++){
-        let setB = new Set(sequenceWithCPTresults[j]);
-        let myScore = jaccard(setA, setB);
-        score += myScore;
-      }
-      allSequences[i].score = score;
-    }
-    console.log(allSequences);
-    let sorted = allSequences.sort( (a, b) => {
-      return b.score - a.score; 
-    })
-    console.log(sorted);
-    let top5 = sorted.slice(0,5);
-    return top5;
-    */
-  //get the most similar to the ones on the prev. step using Jaccard
-  let topForeachCPTsuggestions = [];
-  for (let i = 0; i < sequenceWithCPTresults.length; i++) {
-    let myBestScore = -1;
-    let best;
-    let setA = new Set(sequenceWithCPTresults[i]);
-    for (let j = 0; j < allSequences.length; j++) {
-      let setB = new Set(allSequences[j].rule_sequence);
-      let myScore = jaccard(setA, setB);
-      if (myScore > myBestScore) {
-        best = allSequences[j];
-        myBestScore = myScore;
-      }
-    }
-    if (best) {
-      topForeachCPTsuggestions.push(best);
-    }
-  }
-  console.log(topForeachCPTsuggestions);
-  //filter repeated recs
-  let uniqueIds = [];
-  let uniqueRecs = [];
-  for (let i = 0; i < topForeachCPTsuggestions.length; i++) {
-    let myId = topForeachCPTsuggestions[i].id;
-    if (!uniqueIds.includes(myId)) {
-      uniqueIds.push(myId);
-      uniqueRecs.push(topForeachCPTsuggestions[i]);
-    }
-  }
-  console.log(uniqueRecs);
-  return uniqueRecs;
-}
-
-/**
- * Indice di Jaccard tra 2 set
- * @param {*} setA 
- * @param {*} setB 
- */
-function jaccard(setA, setB) {
-  "use strict";
-  // intersezione (overlap) dei due insiemi
-  const intersection = new Set(
-    [...setA].filter(e => setB.has(e))
-  );
-  // unione dei due insiemi 
-  const union = new Set();
-  setA.forEach(e => {
-    union.add(e);
-  });
-  setB.forEach(e => {
-    union.add(e);
-  });
-  const numerator = intersection.size;
-  const denominator = union.size;
-  const score = numerator / denominator;
-  return score;
-}
-
+*/
 
 /**
  *  
@@ -1796,6 +1672,7 @@ function jaccard(setA, setB) {
  * @param {*} linkType 
  */
 function textareaMessagesManager(lastBlock, linkType, recType) {
+  /*
   if (recType === "onlySeq") {
     if (lastBlock.blockType === "trigger") {
       errorMessages.afterTriggerMessage();
@@ -1818,449 +1695,9 @@ function textareaMessagesManager(lastBlock, linkType, recType) {
       errorMessages.startActionEditing();
     }
   }
+  */
 }
 
-
-/**
- * Fire first a sequence recommendation, a NN based rec, then joins the two 
- * using a voting ensemble. 
- * @param {*} lastBlock 
- * @param {*} blockType 
- */
-async function fireFullDataRec(lastBlock, blockType, sequence, linkType) {
-  let lastBlockObj;
-  console.log("//////////////////////////////////////")
-  console.log("FIRING A FULL RECOMMENDATION")
-  if (blockType === "trigger") {
-    lastBlockObj = DB.createTriggerFromSingleBlock(lastBlock);
-  }
-  else if (blockType === "action") {
-    lastBlockObj = DB.createActionFromSingleBlock(lastBlock);
-  }
-  else {
-    console.log("WRONG RULE TYPE! rule suggestion not fired")
-    return false;
-  }
-  let lastBlockElementAtt = BlockSuggestor.generateElementAttFromRuleElement(lastBlockObj, blockType);
-  //call CPT!
-  let CPTpredictions = obtainSequenceRec(sequence, RS_values.getPreviousElementToConsider_CPT(), 10);
-  let CPTpredictionsCheck = [];
-  if (CPTpredictions[0] && CPTpredictions[0].length > 0) { //horrible error handling
-    CPTpredictionsCheck = CPTpredictions[0];
-  }
-  //call NN!
-  //Featurs: el_name, el_type, act_type, trigg_type, link_type, negation
-  //let test = await neuralNetworkTest().then();
-  let NNpredictions;
-  try {
-    NNpredictions = await neuralNetwork.classify(lastBlockElementAtt.elementName, lastBlockElementAtt.elementType, lastBlockElementAtt.actionType,
-      lastBlockElementAtt.triggerType, lastBlockElementAtt.nextOp, lastBlockElementAtt.negation).then();
-  }
-  catch {
-    //if(NNpredictions === "error"){
-    if (CPTpredictionsCheck.length > 0) {
-      errorMessages.cleanTextAreaAlerts();
-      clearSuggestionWorkspace();
-      RS_values.setLastRec_CPT(CPTpredictions); //save the last prediciton
-      let onlySequenceElements = mapToOnlyNameArr(CPTpredictions[0]);
-      //let xmlBlocks = DomModifiers.createBlocksFromSuggested(onlySequenceElements); //??
-      DomModifiers.blocksToSuggestionWorkspace(onlySequenceElements);
-      return;
-    }
-    else {
-      errorMessages.suggestorErrorMessages("noSuggestion");
-      return;
-    }
-  }
-  RS_values.setLastRec_NN(NNpredictions);
-  let ensembledResults = voteEnsembler(CPTpredictionsCheck, NNpredictions);
-  // n of predictions, incompatibleCheck and minConfidence should be controlled via the user interface 
-  let predictionToObtain = 5;
-  let minimumConfidence = RS_values.getMinimumConfidence_NN();
-  let filterIncompatibleCheck = true;
-  let top5ensembledResults = obtainTopRec(ensembledResults, predictionToObtain);
-  console.log("NN PREDICTIONS:");
-  console.log(NNpredictions);
-  console.log("RESUTLS AFTER ENSEMBLE!!");
-  console.log(ensembledResults);
-  clearSuggestionWorkspace();
-  let minimumConfidenceFiltered = minimumConfidenceFilter(top5ensembledResults, minimumConfidence);
-  let filteredIncompatible = filterIncompatible(minimumConfidenceFiltered, filterIncompatibleCheck, linkType);
-  let filteredRepeated = filterRepeated(filteredIncompatible, sequence);
-  checkIfRuleEnd(filteredRepeated);
-  //let xmlBlocks = DomModifiers.createBlocksFromSuggested(onlySequenceElements); //???
-  let onlySequenceElements = mapToOnlyNameObj(filteredRepeated);
-  DomModifiers.blocksToSuggestionWorkspace(onlySequenceElements);
-}
-
-/**
- * Send a message to the textarea if the rules usually ends after the inserted 
- * rule element 
- * @param {*} list 
- */
-function checkIfRuleEnd(list) {
-  for (let i = 0; i < list.length; i++) {
-    if (list[i].label === "none") {
-      errorMessages.oftenRuleEnds();
-      break;
-    }
-  }
-  return;
-}
-
-/**
- * Test set for NN prediction model
- */
-async function neuralNetworkTest() {
-  let test1 = ["bathroom-lightLevel", "trigger", "none", "event", "rule", "none"];
-  let test2 = ["bathroom-lightLevel", "trigger", "none", "event", "rule", "negation with time"];
-  let test3 = ["greatLuminaire-temperature", "trigger", "none", "event", "and", "none"];
-  let test4 = ["Bathroom-Relax", "action", "extended", "none", "sequential", "none"];
-  let test5 = ["Bedroom-Relax", "action", "extended", "none", "sequential", "none"];
-  let prediction1 = await neuralNetwork.classify(test1[0], test1[1], test1[2], test1[3], test1[4], test1[5]).then();
-  console.log(prediction1);
-  let prediction2 = await neuralNetwork.classify(test2[0], test2[1], test2[2], test2[3], test2[4], test2[5]).then();
-  console.log(prediction2);
-  let prediction3 = await neuralNetwork.classify(test3[0], test3[1], test1[2], test3[3], test3[4], test3[5]).then();
-  console.log(prediction3);
-  let prediction4 = await neuralNetwork.classify(test4[0], test4[1], test4[2], test4[3], test4[4], test4[5]).then();
-  console.log(prediction4);
-}
-
-/**
- * Remove from suggestions rule objs already in the current sequence
- * @param {*} list 
- * @param {*} previousInsertedSequence 
- */
-function filterRepeated(list, previousInsertedSequence) {
-  let filtered = list.filter((e) => {
-    return previousInsertedSequence.includes(e.label) ? false : true;
-  });
-  return filtered;
-}
-
-
-/**
- * Use linktype value to prevent strange behaviours
- * @param {*} list 
- * @param {*} check 
- */
-function filterIncompatible(list, check, linkType) {
-  if (!check) {
-    return list;
-  }
-  if (linkType === "rule") {
-    let filtered = list.filter((e) => {
-      return checkInActionInfoOnlyName(e.label);
-    });
-    return filtered;
-  }
-  else if (linkType === "and" || linkType === "or") {
-    let filtered = list.filter((e) => {
-      return checkInTriggerInfoWithName(e.label);
-    });
-    return filtered;
-  }
-  else if (linkType === "sequential" || linkType === "parallel") {
-    let filtered = list.filter((e) => {
-      return e.label === "none" || checkInActionInfoOnlyName(e.label);
-    });
-    return filtered;
-  }
-  return list;
-}
-
-/**
- * Use a minimum confindence value to prevent strange behaviours
- * @param {*} list 
- * @param {*} minConf 
- */
-function minimumConfidenceFilter(list, minConf) {
-  let copy = list.filter((e) => {
-    return e.value > minConf;
-  });
-  console.log(copy);
-  return copy;
-}
-
-/**
- * nomen omen 
- * @param {*} resultObj 
- * @param {*} nOfRec 
- */
-function obtainTopRec(resultObj, nOfRec) {
-  console.log(resultObj);
-  resultObj.sort((a, b) => {
-    return b.value - a.value;
-  });
-  let sliced = resultObj.slice(0, nOfRec);
-  return sliced;
-}
-
-/**
- * Mixes the CPT and NN predictors results using the passed weight scores
- * @param {*} CPTpredictions 
- * @param {*} NNpredictions 
- * @param {*} CPTweight 
- * @param {*} NNweight 
- */
-function voteEnsembler(CPTpredictions, NNpredictions, CPTweight = 0.5, NNweight = 1) {
-  let results = [];
-  for (let el in NNpredictions) {
-    let singleResult = {
-      label: NNpredictions[el].label,
-      value: NNpredictions[el].confidence * NNweight
-    }
-    let onlyLabels = CPTpredictions.map(entry => entry[0]);
-    let index = onlyLabels.indexOf(NNpredictions[el].label);
-    if (index !== -1) {
-      singleResult.value += CPTpredictions[index][1] * CPTweight;
-    }
-    results.push(singleResult);
-  }
-  return results;
-}
-
-/**
- * Generate a suggestion with CPT using the block sequence. If no result is 
- * found, use only the last sequence element. 
- * @param {*} blockSequence 
- */
-export function fireOnlySequenceRec(blockSequence, blockType, lastBlock) {
-  console.log("//////////////////////////////////////")
-  console.log("FIRING A SEQUENCE RECOMMENDATION")
-  let predictions = obtainSequenceRec(blockSequence, RS_values.getPreviousElementToConsider_CPT(), 5);
-  if (predictions[0] && predictions[0].length > 0) {
-    console.log("SEQUENCE PREDICTIONS:");
-    console.log(predictions);
-    clearSuggestionWorkspace();
-    errorMessages.cleanTextAreaAlerts();
-    RS_values.setLastRec_CPT(predictions); //save the last prediciton
-    let onlySequenceElements = mapToOnlyNameArr(predictions[0]);
-    //let xmlBlocks = DomModifiers.createBlocksFromSuggested(onlySequenceElements); //??
-    DomModifiers.blocksToSuggestionWorkspace(onlySequenceElements);
-    return;
-  }
-  else {
-    let predictions = obtainSequenceRec([lastBlock.type], RS_values.getPreviousElementToConsider_CPT(), 5);
-    if (predictions[0] && predictions[0].length > 0) {
-      console.log("SEQUENCE PREDICTIONS: ONLY LAST ELEMENT");
-      console.log(predictions);
-      clearSuggestionWorkspace();
-      errorMessages.cleanTextAreaAlerts();
-      RS_values.setLastRec_CPT(predictions); //save the last prediciton
-      let onlySequenceElements = mapToOnlyNameArr(predictions[0]);
-      //let xmlBlocks = DomModifiers.createBlocksFromSuggested(onlySequenceElements); //??
-      DomModifiers.blocksToSuggestionWorkspace(onlySequenceElements);
-      return;
-    }
-  }
-  errorMessages.suggestorErrorMessages("noSuggestion");
-}
-
-
-/**
- * Generate a suggestion with CPT, do not modify the DOM but returns the result
- * @param {*} blockSequence 
- */
-export function fireOnlySequenceRecNoDom(blockSequence, blockType) {
-  console.log("//////////////////////////////////////")
-  console.log("FIRING A SEQUENCE RECOMMENDATION")
-  let elementsToConsider = RS_values.getPreviousElementToConsider_CPT();
-  console.log(elementsToConsider);
-  let predictions = obtainSequenceRec(blockSequence, elementsToConsider, 5);
-  if (predictions[0] && predictions[0].length > 0) {
-    console.log("SEQUENCE PREDICTIONS:");
-    console.log(predictions);
-    let onlySequenceElements = mapToOnlyNameArr(predictions[0]);
-    return {
-      predictions: predictions,
-      onlySequenceElements: onlySequenceElements
-    };
-  }
-}
-
-function obtainSequenceRec(blockSequence, lastNElementsToUse, predictionsNumber) {
-  let target = [
-    blockSequence
-  ];
-  console.log("WILL USE THE LAST ", lastNElementsToUse, " ELEMENTS FOR PREDICTION");
-  let predictions = CPTmodel.predict(
-    target, // Test input
-    lastNElementsToUse, // The number of last elements that will be used
-    // to find similar sequences, (default: target.length)
-    predictionsNumber  // The number of predictions required.
-  );
-  return predictions
-}
-
-/**
- * 
- * @param {*} predictionsArr 
- */
-function mapToOnlyNameArr(predictionsArr) {
-  return predictionsArr.map(entry => entry[0]);
-}
-
-/**
- * 
- * @param {*} predictionsArr 
- */
-function mapToOnlyNameObj(predictionsArr) {
-  return predictionsArr.map(entry => entry.label);
-}
-
-/**
- * Ottiene il primo trigger nel blocco regola, estrae dal DB le altre regole che 
- * iniziano per quel trigger, crea la lista di suggerimenti e la trasforma in blocchi
- */
-async function suggestorRule() {
-  "use strict";
-  //let firstTrigger = getFirstTrigger();
-  let firstTrigger = getLastTrigger();
-  if (!firstTrigger) {
-    errorMessages.suggestorErrorMessages("noFirstTrigger");
-    return;
-  }
-  // Non prendere solo regole con first trigger, ma che contengano questo trigger
-  let rulesWithFirstTrigger = await DB.getGraphsFromDB(firstTrigger).then();
-  if (!rulesWithFirstTrigger || rulesWithFirstTrigger.length === 0) {
-    const myCategory = getTriggerCategory(firstTrigger);
-    const triggerWithMyCategory = getTriggerWithMyCategory(myCategory);
-    // qua ho una lista di nomi di trigger
-    rulesWithFirstTrigger = await DB.getGraphsFromDBCategory(triggerWithMyCategory).then();
-    firstTrigger = triggerWithMyCategory;
-    // qua dovrei avere una lista di regole che cominciano con uno dei trigger estratti precedentemente
-    console.log("rules with trigger category: ");
-    console.log(rulesWithFirstTrigger);
-
-    if (!rulesWithFirstTrigger || rulesWithFirstTrigger.length === 0) {
-      errorMessages.suggestorErrorMessages("noRulesWithTrigger");
-      return;
-    }
-
-    //suggestorErrorMessages("noRulesWithTrigger");
-    //ruleWithFirstTriggerCategory
-    //return;
-  }
-  console.log("rules with trigger: ");
-  console.log(rulesWithFirstTrigger);
-  const suggestionListObj = await BlockSuggestor.generateSuggestions(rulesWithFirstTrigger, firstTrigger).then();
-  if (!suggestionListObj || suggestionListObj.resultPathList.length === 0) {
-    errorMessages.suggestorErrorMessages("noSuggestion");
-    return;
-  }
-
-  const allRules = await DB.getAllGraphsFromDB().then();
-  //da suggestionListObj.resultPathList estrai i trigger suggeriti
-  let myTriggers = extractTriggersFromSuggestionList(suggestionListObj.resultPathList);
-  //prova entrance lightlevel
-  //let actionlist = ...
-  const bestSuggestion = await BlockSuggestor.findActionSuggestion(myTriggers, allRules).then();
-  console.log(bestSuggestion);
-  let actionsXml = DomModifiers.createActionBlocksFromSuggested(bestSuggestion);
-  /*
-  if (bestSuggestion) {
-        DomModifiers.createActionBlocksFromSuggested(bestSuggestion);
-      }
-      else {
-        suggestorErrorMessages("noActionSuggestion");
-        return;
-      }
-      */
-  let triggersXml = createTriggerBlocksFromSuggested(suggestionListObj.resultPathList);
-  DomModifiers.appendFullRuleToSuggestions(triggersXml, actionsXml);
-
-}
-
-let exportSuggestorRule = suggestorRule;
-export { exportSuggestorRule };
-
-function extractTriggersFromSuggestionList(listObj) {
-  let myTriggers = [];
-  let triggerInfo = getTriggerInfo();
-
-  for (let obj in listObj) {
-    if (!myTriggers.includes(listObj[obj].source) && checkInTriggerInfoWithName(listObj[obj].source)) {
-      myTriggers.push(listObj[obj].source);
-    }
-    if (!myTriggers.includes(listObj[obj].dest) && checkInTriggerInfoWithName(listObj[obj].dest)) {
-      myTriggers.push(listObj[obj].dest);
-    }
-  }
-  console.log(myTriggers);
-  return myTriggers;
-}
-
-/**
- * Ottiene il primo trigger nel blocco regola, estrae dal DB le altre regole che 
- * iniziano per quel trigger, crea la lista di suggerimenti e la trasforma in blocchi
- */
-async function suggestorCategory() {
-  const firstTrigger = getFirstTrigger();
-  if (!firstTrigger) {
-    errorMessages.suggestorErrorMessages("noFirstTrigger");
-    return;
-  }
-
-  const myCategory = getTriggerCategory(firstTrigger);
-  const triggerWithMyCategory = getTriggerWithMyCategory(myCategory);
-  // qua ho una lista di nomi di trigger
-  const rulesWithFirstTriggerCategory = await DB.getGraphsFromDBCategory(triggerWithMyCategory).then();
-  // qua dovrei avere una lista di regole che cominciano con uno dei trigger estratti precedentemente
-  console.log("rules with trigger category: ");
-  console.log(rulesWithFirstTriggerCategory);
-  if (!rulesWithFirstTriggerCategory || rulesWithFirstTriggerCategory.length === 0) {
-    errorMessages.suggestorErrorMessages("noRulesWithTrigger");
-    return;
-  }
-  const suggestionListObj = await BlockSuggestor.generateSuggestions(rulesWithFirstTriggerCategory, triggerWithMyCategory).then();
-  if (!suggestionListObj || suggestionListObj.resultPathList.length === 0) {
-    errorMessages.suggestorErrorMessages("noSuggestion");
-    return;
-  }
-  createBlocksFromSuggested(suggestionListObj.resultPathList);
-
-}
-
-const exportSuggestorCategory = suggestorCategory;
-export { exportSuggestorCategory };
-
-/**
- * 
- */
-async function suggestorAction() {
-  "use strict";
-  //  const allMyTriggers = getTriggerList();
-  //  console.assert(allMyTriggers, "No triggers!");
-  let blocksInRule = createRuleBlocksObj();
-  if (blocksInRule && blocksInRule.triggers && blocksInRule.triggers.length > 0) {
-    const allRules = await DB.getAllGraphsFromDB().then();
-    //AllRules prende la regola sbagliata! mi sa che fa la query sul db normale, non sui graph
-    console.log("ALL RULES:");
-    console.log(allRules);
-    const myTriggers = blocksInRule.triggersRealName;
-    console.log(blocksInRule);
-    console.log("MY TRIGGERS:");
-    console.log(myTriggers);
-    if (allRules && allRules.length > 0) {
-      // si parte dalle regole che condividono almeno un trigger: inutile fare
-      // il controllo di similarità su tutte
-      console.log(getActionList());
-
-      const bestSuggestion = await BlockSuggestor.findActionSuggestion(myTriggers, allRules).then();
-      if (bestSuggestion) {
-        DomModifiers.actionsToSuggestionWorkspace(bestSuggestion);
-      }
-      else {
-        errorMessages.suggestorErrorMessages("noActionSuggestion");
-        return;
-      }
-    }
-  }
-}
-const exportSuggestorAction = suggestorAction;
-export { exportSuggestorAction };
 
 /**
  * UNUSED
@@ -2427,6 +1864,8 @@ export function getActionInfo() {
 }
 
 /**
+ * TODO: CONTROLLA SE FUNZIONA ANCORA
+ * E' USATA PER JACCARD, QUINDI SI POTREBBE ANCHE ELIMINARE
  * Ottiene la categoria di un trigger
  * @param {*} triggerName 
  * @param {*} triggerInfo
@@ -2449,6 +1888,8 @@ export function getTriggerCategory(triggerName) {
 }
 
 /**
+ * TODO: CONTROLLA SE FUNZIONA ANCORA ADESSO CHE triggerInfo è un obj!!
+ * NON VIENE MAI USATA, SI POTREBBE ELIMINARE
  * Ottiene gli altri trigger con la stessa categoria
  * @param {*} myCategory 
  * @param {*} triggerInfo 
@@ -2659,30 +2100,18 @@ export function onSignIn(googleUser) {
  * dal tasto checkRule e inoltre eseguito quando si prova a salvare una regola 
  */
 export function checkRuleStructure() {
-  let onlyOneRuleStatus;
-  let triggerSequenceStatus;
-  let actionSequenceStatus;
-  let textError;
-  onlyOneRuleStatus = checkOnlyOneRule();
-  if (onlyOneRuleStatus === "OK") {
-    triggerSequenceStatus = checkTriggerSequence();
-    if (triggerSequenceStatus === "OK") {
-      actionSequenceStatus = checkActionSequence();
-      if (actionSequenceStatus === "OK") {
-        return "OK";
-      }
-      else {
-        textError = actionSequenceStatus;
-      }
-    }
-    else {
-      textError = triggerSequenceStatus;
-    }
+  let checkStatus = "OK";
+  let onlyOneRuleStatus = checkOnlyOneRule();
+  checkStatus = onlyOneRuleStatus;
+  if (checkStatus === "OK") {
+    let triggerSequenceStatus = checkTriggerSequence();
+    checkStatus = triggerSequenceStatus;
   }
-  else {
-    textError = onlyOneRuleStatus;
+  if (checkStatus === "OK") {
+    let actionSequenceStatus = checkActionSequence();
+    checkStatus = actionSequenceStatus;
   }
-  return textError;
+  return checkStatus;
 }
 
 /**
@@ -2783,8 +2212,6 @@ export function checkIfTriggerOperator(block) {
  */
 export function getTriggerWithNoNextConnection(workspace = getWorkspace()) {
   for (let block in workspace.blockDB_) {
-    //    let isTrigger = checkInTriggerInfo(workspace.blockDB_[block]);
-    //    if (isTrigger);
     if (workspace.blockDB_[block].isTrigger || workspace.blockDB_[block].isTriggerArray) {
       if (!workspace.blockDB_[block].nextConnection.targetConnection) {
         return workspace.blockDB_[block];
@@ -2823,17 +2250,6 @@ export function hasActionChild(ruleBlock = getRuleBlock()) { //ES6 default param
     }
   });
   return result;
-  /*
-   let myChildren = ruleBlock.getChildren();
-   for (let i = 0; i < myChildren.length; i++) {
-     console.log(myChildren[i]);
-     if (checkIfAction(myChildren[i]) || myChildren[i].type==="parallel_dynamic") {
-       console.log("RETURN TRUE!!!");
-       return true;
-     }
-   }
-   return false;
-   */
 }
 
 /**
@@ -2849,15 +2265,6 @@ export function hasTriggerChild(ruleBlock = getRuleBlock()) { //ES6 default para
     }
   });
   return result;
-  /*
-  for (let i = 0; i < myChildren.length; i++) {
-    console.log(myChildren[i]);
-    if (myChildren[i].isTrigger || myChildren[i].isTriggerArray) {
-      return true;
-    }
-  }
-  return false;
-  */
 }
 
 /**
@@ -2946,883 +2353,939 @@ function checkActionSequenceConsistancy(block) {
     else {
       let nextBlock = block.childBlocks_[0];
       const nextTargetConnection = nextBlock.nextConnection.targetConnection;
-        if (nextTargetConnection) {
-          const nextBlock = nextTargetConnection.sourceBlock_;
-          checkActionSequenceConsistancy(nextBlock);
-        }
+      if (nextTargetConnection) {
+        const nextBlock = nextTargetConnection.sourceBlock_;
+        checkActionSequenceConsistancy(nextBlock);
+      }
     }
   }
   else {
-      const nextTargetConnection = block.nextConnection.targetConnection;
-      if (nextTargetConnection) {
-        const nextBlock = nextTargetConnection.sourceBlock_;
-        checkActionSequenceConsistancy(nextBlock);
-      }
+    const nextTargetConnection = block.nextConnection.targetConnection;
+    if (nextTargetConnection) {
+      const nextBlock = nextTargetConnection.sourceBlock_;
+      checkActionSequenceConsistancy(nextBlock);
     }
   }
+}
 
-  /**
-   * Controlla solo che ai blocchi parallel_dynamic sia collegato un blocco
-   * azione. Serve a evitare parallel nested: da rivedere se ci vuole cercare
-   * altri problemi. USARE SE SI USA IL BLOCCO PARALLEL_DYNAMIC: ALTRIMENTI 
-   * NON SERVE
-   * @param {*} block 
-   */
-  function checkActionSequenceConsistancyParallel_dynamic(block) {
-    if (block.type === "parallel_dynamic") {
-      block.childBlocks_.forEach(function (e) {
-        if (e.type === "action_placeholder") {
-          const nextTargetConnection = e.nextConnection.targetConnection;
-          if (nextTargetConnection) {
-            const nextBlock = nextTargetConnection.sourceBlock_;
-            if (checkInActionInfo(nextBlock)) {
-              checkActionSequenceConsistancy(nextBlock);
-            }
-            else {
-              inconsistentActionSequence = true;
-            }
-          }
-        }
-      });
-    }
-    else {
-      const nextTargetConnection = block.nextConnection.targetConnection;
-      if (nextTargetConnection) {
-        const nextBlock = nextTargetConnection.sourceBlock_;
-        checkActionSequenceConsistancy(nextBlock);
-      }
-    }
-  }
-
-  /**
-   * 
-   * @param {*} block 
-   */
-  function isEventCondition(block) {
-    if (!block) {
-      return false;
-    }
-    if (block.type === "event" || block.type === "condition") {
-      return true;
-    }
-    return false;
-  }
-
-  /**
-   * returns true if the block has an event or condition type child block
-   * @param {*} block 
-   */
-  function hasEventConditionChild(block) {
-    if (!block) {
-      return false;
-    }
-    for (let i = 0; i < block.childBlocks_.length; i++) {
-      console.log(block.childBlocks_[i])
-      if (block.childBlocks_[i].type === "event" || block.childBlocks_[i].type === "condition") {
-        return true;
-      }
-    };
-    return false;
-  }
-
-  /**
-   * 
-   * @param {*} block 
-   */
-  function checkTriggerSequenceConsistancy(block) {
-    // se il blocco è trigger, controlla che il collegamento verso il prossimo 
-    // blocco sia accettabile, poi richiama ricorsivamente su di esso
-    if (checkInTriggerInfo(block)) {
-      let isTrigger = checkInTriggerInfo(block);
-      if (isTrigger) {
-        if (!hasEventConditionChild(block)) {
-          inconsistentTriggerMessage = "Trigger must have a type (event or condition) defined";
-          inconsistentTriggerSequence = true;
-        }
-        const nextTargetConnection = block.nextConnection.targetConnection;
+/**
+ * Controlla solo che ai blocchi parallel_dynamic sia collegato un blocco
+ * azione. Serve a evitare parallel nested: da rivedere se ci vuole cercare
+ * altri problemi. USARE SE SI USA IL BLOCCO PARALLEL_DYNAMIC: ALTRIMENTI 
+ * NON SERVE
+ * @param {*} block 
+ */
+function checkActionSequenceConsistancyParallel_dynamic(block) {
+  if (block.type === "parallel_dynamic") {
+    block.childBlocks_.forEach(function (e) {
+      if (e.type === "action_placeholder") {
+        const nextTargetConnection = e.nextConnection.targetConnection;
         if (nextTargetConnection) {
           const nextBlock = nextTargetConnection.sourceBlock_;
-          // se si vuole rendere accettabile anche il collegamento verso un blocco
-          // trigger, aggiungere checkInTriggerInfo(nextBlock)
-          if (
-            nextBlock.type === "and" ||
-            nextBlock.type === "or" ||
-            nextBlock.type === "group") {
-            checkTriggerSequenceConsistancy(nextBlock);
+          if (checkInActionInfo(nextBlock)) {
+            checkActionSequenceConsistancy(nextBlock);
           }
-          //else if (BlockSuggestor.isEventCondition(nextBlock)) {
-          //console.log("event or condition block: do nothing");
-          //}
           else {
-            inconsistentTriggerMessage = "Trigger must be connected via a trigger operator (and, or, group)";
-            inconsistentTriggerSequence = true;
+            inconsistentActionSequence = true;
           }
         }
       }
+    });
+  }
+  else {
+    const nextTargetConnection = block.nextConnection.targetConnection;
+    if (nextTargetConnection) {
+      const nextBlock = nextTargetConnection.sourceBlock_;
+      checkActionSequenceConsistancy(nextBlock);
     }
-    // Se è un blocco and o or guarda che il prossimo blocco sia un trigger o 
-    // un group
-    else if (block.type === "and" || block.type === "or") {
+  }
+}
+
+/**
+ * 
+ * @param {*} block 
+ */
+function isEventCondition(block) {
+  if (!block) {
+    return false;
+  }
+  if (block.type === "event" || block.type === "condition") {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * returns true if the block has an event or condition type child block
+ * @param {*} block 
+ */
+function hasEventConditionChild(block) {
+  if (!block) {
+    return false;
+  }
+  for (let i = 0; i < block.childBlocks_.length; i++) {
+    console.log(block.childBlocks_[i])
+    if (block.childBlocks_[i].type === "event" || block.childBlocks_[i].type === "condition") {
+      return true;
+    }
+  };
+  return false;
+}
+
+/**
+ * 
+ * @param {*} block 
+ */
+function checkTriggerSequenceConsistancy(block) {
+  // se il blocco è trigger, controlla che il collegamento verso il prossimo 
+  // blocco sia accettabile, poi richiama ricorsivamente su di esso
+  if (checkInTriggerInfo(block)) {
+    let isTrigger = checkInTriggerInfo(block);
+    if (isTrigger) {
+      if (!hasEventConditionChild(block)) {
+        inconsistentTriggerMessage = "Trigger must have a type (event or condition) defined";
+        inconsistentTriggerSequence = true;
+      }
       const nextTargetConnection = block.nextConnection.targetConnection;
       if (nextTargetConnection) {
         const nextBlock = nextTargetConnection.sourceBlock_;
-        if (checkInTriggerInfo(nextBlock) || nextBlock.type === "group") {
+        // se si vuole rendere accettabile anche il collegamento verso un blocco
+        // trigger, aggiungere checkInTriggerInfo(nextBlock)
+        if (
+          nextBlock.type === "and" ||
+          nextBlock.type === "or" ||
+          nextBlock.type === "group") {
           checkTriggerSequenceConsistancy(nextBlock);
         }
+
         else {
-          inconsistentTriggerMessage = "Trigger operators (and, or) must connect together two triggers or a group operator";
+          inconsistentTriggerMessage = "Trigger must be connected via a trigger operator (and, or, group)";
           inconsistentTriggerSequence = true;
         }
+      }
+    }
+  }
+  // Se è un blocco and o or guarda che il prossimo blocco sia un trigger o 
+  // un group
+  else if (block.type === "and" || block.type === "or") {
+    const nextTargetConnection = block.nextConnection.targetConnection;
+    if (nextTargetConnection) {
+      const nextBlock = nextTargetConnection.sourceBlock_;
+      if (checkInTriggerInfo(nextBlock) || nextBlock.type === "group") {
+        checkTriggerSequenceConsistancy(nextBlock);
       }
       else {
         inconsistentTriggerMessage = "Trigger operators (and, or) must connect together two triggers or a group operator";
         inconsistentTriggerSequence = true;
       }
     }
-    // se è un blocco group guarda che il prossimo blocco sia un trigger o un 
-    // blocco di connessione, e se il blocco al suo interno sia di tipo trigger. 
-    // richiama ricorsivamente anche sul blocco interno. 
-    else if (block.type === "group") {
-      const nextTargetConnection = block.nextConnection.targetConnection;
-      if (nextTargetConnection) {
-        const nextBlock = nextTargetConnection.sourceBlock_;
-        if (checkInTriggerInfo(nextBlock) ||
-          nextBlock.type === "or" ||
-          nextBlock.type === "and") {
-          checkTriggerSequenceConsistancy(nextBlock);
-        }
-        else {
-          inconsistentTriggerMessage = "Group operator must be connected to a triggerlogic operator ('and', 'or')";
-          inconsistentTriggerSequence = true;
-        }
+    else {
+      inconsistentTriggerMessage = "Trigger operators (and, or) must connect together two triggers or a group operator";
+      inconsistentTriggerSequence = true;
+    }
+  }
+  // se è un blocco group guarda che il prossimo blocco sia un trigger o un 
+  // blocco di connessione, e se il blocco al suo interno sia di tipo trigger. 
+  // richiama ricorsivamente anche sul blocco interno. 
+  else if (block.type === "group") {
+    const nextTargetConnection = block.nextConnection.targetConnection;
+    if (nextTargetConnection) {
+      const nextBlock = nextTargetConnection.sourceBlock_;
+      if (checkInTriggerInfo(nextBlock) ||
+        nextBlock.type === "or" ||
+        nextBlock.type === "and") {
+        checkTriggerSequenceConsistancy(nextBlock);
       }
-      //controllo sull'interno di group
-      const groupInput = block.inputList.find(function (e) {
-        return e;
-      });
-      if (groupInput.connection.targetConnection) {
-        const connectedBlock = groupInput.connection.targetConnection.targetConnection.targetConnection.sourceBlock_;
-        if (checkInTriggerInfo(connectedBlock)) {
-          checkTriggerSequenceConsistancy(connectedBlock);
-        }
-        else {
-          inconsistentTriggerMessage = "First block inside 'Group' operator must be a trigger";
-          inconsistentTriggerSequence = true;
-        }
+      else {
+        inconsistentTriggerMessage = "Group operator must be connected to a triggerlogic operator ('and', 'or')";
+        inconsistentTriggerSequence = true;
+      }
+    }
+    //controllo sull'interno di group
+    const groupInput = block.inputList.find(function (e) {
+      return e;
+    });
+    if (groupInput.connection.targetConnection) {
+      const connectedBlock = groupInput.connection.targetConnection.targetConnection.targetConnection.sourceBlock_;
+      if (checkInTriggerInfo(connectedBlock)) {
+        checkTriggerSequenceConsistancy(connectedBlock);
       }
       else {
         inconsistentTriggerMessage = "First block inside 'Group' operator must be a trigger";
         inconsistentTriggerSequence = true;
       }
     }
-    // se il blocco ha un connessione not attiva, controlla che vi sia 
-    // effettivamente collegato un blocco not
-    const notInput = block.inputList.find(function (e) {
-      return e.name === "not_input_statement";
-    });
-    if (notInput) {
-      const otherBlockConnection = notInput.connection.targetConnection;
-      if (otherBlockConnection) {
-        const connectedBlock = otherBlockConnection.targetConnection.targetConnection.sourceBlock_;
-        if (connectedBlock.type !== "not_dynamic") {
-          inconsistentTriggerMessage = "Only 'not' blocks can be connected to the 'not' input";
-          inconsistentTriggerSequence = true;
-        }
-      }
-      else {
-        inconsistentTriggerMessage = "A 'not' block have to be connected to the 'not' input";
+    else {
+      inconsistentTriggerMessage = "First block inside 'Group' operator must be a trigger";
+      inconsistentTriggerSequence = true;
+    }
+  }
+  // se il blocco ha un connessione not attiva, controlla che vi sia 
+  // effettivamente collegato un blocco not
+  const notInput = block.inputList.find(function (e) {
+    return e.name === "not_input_statement";
+  });
+  if (notInput) {
+    const otherBlockConnection = notInput.connection.targetConnection;
+    if (otherBlockConnection) {
+      const connectedBlock = otherBlockConnection.targetConnection.targetConnection.sourceBlock_;
+      if (connectedBlock.type !== "not_dynamic") {
+        inconsistentTriggerMessage = "Only 'not' blocks can be connected to the 'not' input";
         inconsistentTriggerSequence = true;
-        //check "Not" attivata, ma senza nessuna connessione
       }
     }
-    return "OK";
+    else {
+      inconsistentTriggerMessage = "A 'not' block have to be connected to the 'not' input";
+      inconsistentTriggerSequence = true;
+      //check "Not" attivata, ma senza nessuna connessione
+    }
   }
+  return "OK";
+}
 
 
-  /**
-   * Controlla che la sequenza di azioni sia corretta
-   */
-  function checkActionSequence() {
-    let workspace = getWorkspace();
-    let ruleBlock = getRuleBlock(workspace);
-    if (ruleBlock) {
-      let actionInput = ruleBlock.getInput("ACTIONS");
-      //se esiste l'input
-      if (actionInput) {
-        let mainBlockConnection = actionInput.connection;
-        //se non c'è niente collegato restituisco
-        if (!mainBlockConnection.targetConnection) {
-          return "No blocks connected to actions input ";
+/**
+ * Controlla che la sequenza di azioni sia corretta
+ */
+function checkActionSequence() {
+  let workspace = getWorkspace();
+  let ruleBlock = getRuleBlock(workspace);
+  if (ruleBlock) {
+    let actionInput = ruleBlock.getInput("ACTIONS");
+    //se esiste l'input
+    if (actionInput) {
+      let mainBlockConnection = actionInput.connection;
+      //se non c'è niente collegato restituisco
+      if (!mainBlockConnection.targetConnection) {
+        return "No blocks connected to actions input ";
+      }
+      else {
+        const targetBlock = mainBlockConnection.targetConnection.sourceBlock_;
+        existsChildAction = false;
+        // se non è presente nessuna azione restituisco
+        checkAtLeastOneAction(targetBlock);
+        if (!existsChildAction) {
+          return "No action blocks connected to actions input ";
         }
         else {
-          const targetBlock = mainBlockConnection.targetConnection.sourceBlock_;
-          existsChildAction = false;
-          // se non è presente nessuna azione restituisco
-          checkAtLeastOneAction(targetBlock);
-          if (!existsChildAction) {
-            return "No action blocks connected to actions input ";
+          existsChildNonAction = false;
+          // se nella sequenza di azioni sono presenti blocchi non azione o 
+          // non supporto azione restituisco
+          checkActionChildren(targetBlock);
+          if (existsChildNonAction) {
+            return "Action list contains non action blocks";
           }
-          else {
-            existsChildNonAction = false;
-            // se nella sequenza di azioni sono presenti blocchi non azione o 
-            // non supporto azione restituisco
-            checkActionChildren(targetBlock);
-            if (existsChildNonAction) {
-              return "Action list contains non action blocks";
-            }
-            inconsistentActionSequence = false;
-            checkActionSequenceConsistancy(targetBlock);
-            if (inconsistentActionSequence) {
-              return "Action sequence is not valid, an action operator must connect togheter two actions.";
-            }
-            return "OK";
+          inconsistentActionSequence = false;
+          checkActionSequenceConsistancy(targetBlock);
+          if (inconsistentActionSequence) {
+            return "Action sequence is not valid, an action operator must connect togheter two actions.";
           }
+          return "OK";
         }
       }
     }
   }
+}
 
 
-  /*
-   * Controlla se il trigger passato è presente nel db dei trigger
-   * @param {*} trigger 
-   */
-  export function checkInTriggerInfo(trigger) {
-    const triggerInfo = getTriggerInfo();
-    let found = false;
-    triggerInfo.forEach(function (e) {
-      if (e.fullName === trigger.type) {
-        found = true;
-      }
-    });
-    return found;
-  }
-
-  function getTriggerOps() {
-    return triggerOperators;
-  }
-
-  function getActionOps() {
-    return actionOperators;
-  }
-
-
-  /**
-   * Controlla se il trigger passato è presente nel db dei trigger
-   * @param {*} trigger 
-   */
-  export function checkInTriggerInfoWithName(trigger) {
-    const triggerInfo = getTriggerInfo();
-    let found = false;
-    triggerInfo.forEach(function (e) {
-      if (e.fullName === trigger) {
-        found = true;
-      }
-    });
-    return found;
-  }
-
-  /**
-   * Controlla se il trigger operator passato è presente nel db degli op
-   * @param {*} trigger 
-   */
-  export function checkInTriggerOperators(triggerOp) {
-    const triggerOps = getTriggerOps();
-    let found = false;
-    triggerOps.forEach(function (e) {
-      if (e === triggerOp.type) {
-        found = true;
-      }
-    });
-    return found;
-  }
-
-  /**
-   * Controlla se il trigger operator passato è presente nel db degli op
-   * @param {*} trigger 
-   */
-  export function checkInActionOperators(actionOp) {
-    const actionOps = getActionOps();
-    let found = false;
-    actionOps.forEach(function (e) {
-      if (e === actionOp.type) {
-        found = true;
-      }
-    });
-    return found;
-  }
-
-  /**
-   * Controlla se l'azione passata è presente nel db delle azioni
-   * @param {*} action
-   */
-  function checkInActionInfo(action) {
-    const actionInfo = getActionInfo();
-    let found = false;
-    actionInfo.forEach(function (e) {
-      if (e.fullName === action.type) {
-        found = true;
-      }
-    });
-    return found;
-  }
-
-  /**
-   * check if the passed action name can be found in actions db 
-   * @param {*} action
-   */
-  export function checkInActionInfoOnlyName(action) {
-    const actionInfo = getActionInfo();
-    let found = false;
-    actionInfo.forEach(function (e) {
-      if (e.fullName === action) {
-        found = true;
-      }
-    });
-    return found;
-  }
-
-  /**
-   * Cerca ricorsivamente nei blocchi figlio se c'è un blocco che non fa parte 
-   * ne dei trigger ne dei blocchi di supporto ai trigger
-   * @param {*} trigger 
-   */
-  function checkTriggerChildren(trigger) {
-    if (checkInTriggerInfo(trigger) || triggerSupportBlocks.includes(trigger.type)) {
-      const myChildren = trigger.childBlocks_;
-      for (let i = 0; i < myChildren.length; i++) {
-        checkTriggerChildren(myChildren[i]);
-      }
-    }
-    // se trova un non trigger restituisce
-    else {
-      existsChildNonTrigger = true;
-    }
-  }
-
-  /**
-   * Controlla ricorsivamente che ci sia almeno un blocco trigger collegato 
-   * all'input actions o a uno dei suoi blocchi figlio
-   * @param {*} mainBlockConnection 
-   */
-  function checkAtLeastOneTrigger(trigger) {
-    if (checkInTriggerInfo(trigger)) {
-      existsChildTrigger = true;
-    }
-    else {
-      let myChildren = trigger.childBlocks_;
-      for (let i = 0; i < myChildren.length; i++) {
-        checkAtLeastOneTrigger(myChildren[i]);
-      }
-    }
-  }
-
-  /**
-   * Controlla che la sequenza di azioni sia corretta
-   * @param {*} action 
-   */
-  function checkActionChildren(action) {
-    if (checkInActionInfo(action) || actionSupportBlocks.includes(action.type)) {
-      let myChildren = action.childBlocks_;
-      for (let i = 0; i < myChildren.length; i++) {
-        checkActionChildren(myChildren[i]);
-      }
-    }
-    // se trova un non action restituisce
-    else {
-      existsChildNonAction = true;
-    }
-  }
-
-  /**
-   * Controlla ricorsivamente che ci sia almeno un blocco azione collegato 
-   * all'input actions o a uno dei suoi blocchi figlio
-   * @param {*} mainBlockConnection 
-   */
-  function checkAtLeastOneAction(action) {
-    if (checkInActionInfo(action)) {
-      existsChildAction = true;
-    }
-    else {
-      let myChildren = action.childBlocks_;
-      for (let i = 0; i < myChildren.length; i++) {
-        checkAtLeastOneAction(myChildren[i]);
-      }
-    }
-  }
-
-  /**
-   * Scorre il workspace per eliminare evenutali blocchi non renderizzati
-   * (non servono a nulla)
-   */
-  function removeNonRenderedBlocks() {
-    let workspace = getWorkspace();
-    for (var key in workspace.blockDB_) {
-      if (workspace.blockDB_[key].rendered === false) {
-        delete workspace.blockDB_[key];
-      }
-    }
-  }
-
-
-  /**
-   * Cerca i blocchi "parallel_branch" non collegati ad altri blocchi e li rimuove
-   * @param {*} event 
-   */
-  export function removeUnusedParallel() {
-    let workspace = getWorkspace();
-    for (var key in workspace.blockDB_) {
-      if (workspace.blockDB_[key].type === "action_placeholder") {
-        if (workspace.blockDB_[key] && workspace.blockDB_[key].parentBlock_ === null) {
-          let blockToRemove = workspace.blockDB_[key];
-          blockToRemove.dispose();
-        }
-      }
-    }
-  }
-
-  /**
-   * Helper function per prendere tutti i blocchi nel workspace
-   */
-  export function getAllTriggerInWorkspace() {
-    let triggers = [];
-    let workspace = getWorkspace();
-    for (var key in workspace.blockDB_) {
-      if (checkInTriggerInfo(workspace.blockDB_[key])) {
-        triggers.push(workspace.blockDB_[key]);
-      }
-    }
-    return triggers;
-  }
-
-  /**
-   * Helper function
-   */
-  function getBlocksInRule() {
-    let workspace = getWorkspace();
-    let blocksInRule = workspace.getAllBlocks();
-    return blocksInRule;
-  }
-
-  /**
-   * Helper function
-   */
-  export function createRuleBlocksObj() {
-    "use strict";
-    const blocksInRule = getBlocksInRule();
-    let resultObj = {
-      triggers: [],
-      triggers_op: [],
-      actions: [],
-      actions_op: [],
-      triggersRealName: [],
-      actionsRealName: []
-    };
-    for (let i = 0; i < blocksInRule.length; i++) {
-      if (checkInTriggerInfo(blocksInRule[i])) {
-        resultObj.triggers.push(blocksInRule[i].name);
-        resultObj.triggersRealName.push(blocksInRule[i].type);
-      }
-      else if (checkInTriggerOperators(blocksInRule[i])) {
-        resultObj.triggers_op.push(blocksInRule[i].type);
-      }
-      else if (checkInActionInfo(blocksInRule[i])) {
-        resultObj.actions.push(blocksInRule[i].name);
-        resultObj.actionsRealName.push(blocksInRule[i].type);
-      }
-      else if (checkInActionOperators(blocksInRule[i])) {
-        resultObj.actions_op.push(blocksInRule[i].type);
-      }
-    }
-    return resultObj;
-  }
-
-  /**
-   * TODO
-   * @param {*} ruleElementsObj 
-   */
-  export function createRuleBlocksStr(ruleElementsObj) {
-    console.log(ruleElementsObj);
-    return ruleElementsObj;
-  }
-
-  /**
-   * Converte gli elementi nel campo triggersStr in un array, lo appende all'
-   * oggetto regola passato
-   * @param {*} rule 
-   */
-  export function triggerStrToObj(rule) {
-    let triggersStr = rule.trigger_list;
-    let triggers = triggersStr.split(",");
-    rule.triggers_obj = triggers;
-    return rule;
-  }
-
-  /**
-   * Converte gli elementi nel campo actionsStr in un array, lo appende all'
-   * oggetto regola passato
-   * @param {*} rule 
-   */
-  export function actionStrToObj(rule) {
-    let actionsStr = rule.action_list;
-    let actions = actionsStr.split(",");
-    rule.actions_obj = actions;
-    return rule;
-  }
-
-  /** //TODO: currentUser non viene più usato, si lavora solo con lo storage
-   *  tutte queste funzioni sono duplicate di login e da rimuovere
-   * Controlla se è settato un user nel local storage, se lo è salva nell'user
-   * corrente e mostra il nome
-   */
-  function localStorageChecker() {
-    let user = window.localStorage.getItem('user');
-    if (user) {
-      currentUser = user;
-      //    document.getElementById('user-name').innerHTML = "Logged as: " + currentUser;
-      //    document.getElementById('input-username').value = currentUser;
-    }
-  }
-
-  /**
-   * Salve l'user name nel local storage
-   * @param {*} userName 
-   */
-  export function saveUserToLocal(userName) {
-    window.localStorage.setItem('user', userName);
-    localStorageChecker();
-  }
-
-  /**
-   * 
-   */
-  export function removeUserFromLocal() {
-    localStorage.removeItem("user");
-  }
-
-  /**
-   * Restituisce l'user name attualmente salvato nel localstorage
-   */
-  export function getUserName() {
-    return currentUser;
-  }
-
-  /**
-   * Helper function
-   */
-  export function setLastBlock(block) {
-    lastBlock = block;
-  }
-
-  /**
-   * Helper function
-   */
-  export function getLastBlock() {
-    return lastBlock;
-  }
-
-  /**
-   * Helper function
-   */
-  export function setLastBlocklyEvent(event) {
-    lastBlocklyEvent = event;
-  }
-
-  /**
-   * Helper function
-   */
-  export function getLastBlocklyEvent() {
-    return lastBlocklyEvent;
-  }
-
-  /**
-   * Helper function
-   */
-  export function getRevertPossibility() {
-    return revertPossibility;
-  }
-
-  /**
-   * Helper function
-   */
-  export function setRevertPossibility(val) {
-    revertPossibility = val;
-  }
-
-  /**
-   * Helper function: clears the secondary workspace
-   */
-  export function clearSuggestionWorkspace() {
-    let secondWorkspace = getSuggestionWorkspace();
-    let allSuggestedBlocks = secondWorkspace.getAllBlocks(false);
-    allSuggestedBlocks.forEach(e => e.dispose());
-  }
-
-  export function blockToDom(xml) {
-    return (Blockly.Xml.blockToDom(xml));
-  }
-
-  /**
-   * 
-   * @param {*} allElementAtt 
-   */
-  function convertElementAttInArr(allElementAtt) {
-    let arrayed = [];
-    allElementAtt.forEach(el => {
-      let row = [];
-      row.push(el.element_name);
-      row.push(el.element_type);
-      row.push(el.action_type);
-      row.push(el.trigger_type);
-      row.push(el.link_type);
-      row.push(el.negation);
-      row.push(el.next_element);
-      arrayed.push(row);
-    })
-    return arrayed;
+/*
+ * Controlla se il trigger passato è presente nel db dei trigger
+ * @param {*} trigger 
+ */
+export function checkInTriggerInfo(trigger) {
+  const triggerInfo = getTriggerInfo();
+  if (triggerInfo[trigger.type]) {
+    return true;
   };
+  return false;
+}
 
-  /**
-   * setter 
-   */
-  export function changeRecommendationType() {
-    if (recommendationType === "Step by step recommendations") {
-      recommendationType = "Full rule recommendations";
+function getTriggerOps() {
+  return triggerOperators;
+}
+
+function getActionOps() {
+  return actionOperators;
+}
+
+
+/**
+ * Controlla se il trigger passato è presente nel db dei trigger
+ * @param {*} trigger 
+ */
+export function checkInTriggerInfoWithName(trigger) {
+  const triggerInfo = getTriggerInfo();
+  if (triggerInfo[trigger]) {
+    return true;
+  };
+  return false;
+  /*
+  let found = false;
+  triggerInfo.forEach(function (e) {
+    if (e.fullName === trigger) {
+      found = true;
     }
-    else {
-      recommendationType = "Step by step recommendations";
-    }
-    console.log(recommendationType);
-  }
-
-  /**
-   * setter 
-   */
-  export function setRecommendationType(type) {
-    if (type === "step") {
-
-      recommendationType = "Step by step recommendations";
-    }
-    else if (type === "full") {
-      recommendationType = "Full rule recommendations";
-    }
-    else {
-      recommendationType = "None";
-    }
-    suggestorTypeChanged();
-    console.log(recommendationType);
-  }
-
-
-
-  /**
-   * Start the various behaviours that occurs when the recommendation type 
-   * is changed: change the recType var, change the texts, call a new rec. 
-   */
-  function suggestorTypeChanged() {
-    errorMessages.changeRecTypeDiv();
-    let lastBlock = getLastBlock();
-    if (lastBlock) {
-      let nextBlock = lastBlock.getNextBlock();
-      //attach a trigger/action to the trigger/action operator of the prev block
-      if (nextBlock === null) {
-        ruleSuggestorManager();
-      }
-      else {
-        ruleSuggestorManager(lastBlock, true, nextBlock.blockType);
-      }
-    }
-  }
-
-
-
-  /**
-  * getter
+  });
+  return found;
   */
-  export function getRecType() {
-    return recommendationType;
+}
+
+/**
+ * Controlla se il trigger operator passato è presente nel db degli op
+ * @param {*} trigger 
+ */
+export function checkInTriggerOperators(triggerOp) {
+  const triggerOps = getTriggerOps();
+  let found = false;
+  triggerOps.forEach(function (e) {
+    if (e === triggerOp.type) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+/**
+ * Controlla se il trigger operator passato è presente nel db degli op
+ * @param {*} trigger 
+ */
+export function checkInActionOperators(actionOp) {
+  const actionOps = getActionOps();
+  let found = false;
+  actionOps.forEach(function (e) {
+    if (e === actionOp.type) {
+      found = true;
+    }
+  });
+  return found;
+}
+
+/**
+ * Controlla se l'azione passata è presente nel db delle azioni
+ * @param {*} action
+ */
+export function checkInActionInfo(action) {
+ const actionInfo = getActionInfo();
+  if (actionInfo[action.type]) {
+    return true;
+  };
+  return false;
+  /*
+  const actionInfo = getActionInfo();
+  let found = false;
+  actionInfo.forEach(function (e) {
+    if (e.fullName === action.type) {
+      found = true;
+    }
+  });
+  return found;
+*/
+}
+
+/**
+ * check if the passed action name can be found in actions db 
+ * @param {*} action
+ */
+export function checkInActionInfoOnlyName(action) {
+ const actionInfo = getActionInfo();
+  if (actionInfo[action.type]) {
+    return true;
+  };
+  return false;
+  /*
+  const actionInfo = getActionInfo();
+  let found = false;
+  actionInfo.forEach(function (e) {
+    if (e.fullName === action) {
+      found = true;
+    }
+  });
+  return found;
+  */
+}
+
+/**
+ * Cerca ricorsivamente nei blocchi figlio se c'è un blocco che non fa parte 
+ * ne dei trigger ne dei blocchi di supporto ai trigger
+ * @param {*} trigger 
+ */
+function checkTriggerChildren(trigger) {
+  if (checkInTriggerInfo(trigger) || triggerSupportBlocks.includes(trigger.type)) {
+    const myChildren = trigger.childBlocks_;
+    for (let i = 0; i < myChildren.length; i++) {
+      checkTriggerChildren(myChildren[i]);
+    }
   }
-
-  /**
-   * 
-   * @param {*} parent 
-   */
-  export function removeToInputsFromEventTime(parent) {
-    let inputHour = parent.getInput("END_TIME_HOUR");
-    if (inputHour) {
-      inputHour.dispose();
-    }
-    let inputMin = parent.getInput("END_TIME_MIN");
-    if (inputMin) {
-      inputMin.dispose();
-    }
-    let inputLabelEnd = parent.getInput("END_TIME_LABEL");
-    if (inputLabelEnd) {
-      inputLabelEnd.dispose();
-    }
-    let inputLabelStart = parent.getInput("START_TIME_LABEL");
-    if (inputLabelStart) {
-      inputLabelStart.dispose();
-    }
-
-    parent.appendDummyInput("dummy");
-    parent.removeInput("dummy"); //force block reload
+  // se trova un non trigger restituisce
+  else {
+    existsChildNonTrigger = true;
   }
+}
+
+/**
+ * Controlla ricorsivamente che ci sia almeno un blocco trigger collegato 
+ * all'input actions o a uno dei suoi blocchi figlio
+ * @param {*} mainBlockConnection 
+ */
+function checkAtLeastOneTrigger(trigger) {
+  if (checkInTriggerInfo(trigger)) {
+    existsChildTrigger = true;
+  }
+  else {
+    let myChildren = trigger.childBlocks_;
+    for (let i = 0; i < myChildren.length; i++) {
+      checkAtLeastOneTrigger(myChildren[i]);
+    }
+  }
+}
+
+/**
+ * Controlla che la sequenza di azioni sia corretta
+ * @param {*} action 
+ */
+function checkActionChildren(action) {
+  if (checkInActionInfo(action) || actionSupportBlocks.includes(action.type)) {
+    let myChildren = action.childBlocks_;
+    for (let i = 0; i < myChildren.length; i++) {
+      checkActionChildren(myChildren[i]);
+    }
+  }
+  // se trova un non action restituisce
+  else {
+    existsChildNonAction = true;
+  }
+}
+
+/**
+ * Controlla ricorsivamente che ci sia almeno un blocco azione collegato 
+ * all'input actions o a uno dei suoi blocchi figlio
+ * @param {*} mainBlockConnection 
+ */
+function checkAtLeastOneAction(action) {
+  if (checkInActionInfo(action)) {
+    existsChildAction = true;
+  }
+  else {
+    let myChildren = action.childBlocks_;
+    for (let i = 0; i < myChildren.length; i++) {
+      checkAtLeastOneAction(myChildren[i]);
+    }
+  }
+}
+
+/**
+ * Scorre il workspace per eliminare evenutali blocchi non renderizzati
+ * (non servono a nulla)
+ */
+function removeNonRenderedBlocks() {
+  let workspace = getWorkspace();
+  for (var key in workspace.blockDB_) {
+    if (workspace.blockDB_[key].rendered === false) {
+      delete workspace.blockDB_[key];
+    }
+  }
+}
 
 
-  /**
-   * 
-   */
-  export function removeUnusedInputsFromSecondaryWorkspace() {
-    "use strict";
-    let workspace = getSuggestionWorkspace();
-    let blocks = workspace.getAllBlocks();
-    for (let i = 0; i < blocks.length; i++) {
-      if (blocks[i].type === "event") {
-        let parent = blocks[i].getParent();
-        if (parent && parent.name === "Time") {
-          removeToInputsFromEventTime(parent);
-        }
+/**
+ * Cerca i blocchi "parallel_branch" non collegati ad altri blocchi e li rimuove
+ * @param {*} event 
+ */
+export function removeUnusedParallel() {
+  let workspace = getWorkspace();
+  for (var key in workspace.blockDB_) {
+    if (workspace.blockDB_[key].type === "action_placeholder") {
+      if (workspace.blockDB_[key] && workspace.blockDB_[key].parentBlock_ === null) {
+        let blockToRemove = workspace.blockDB_[key];
+        blockToRemove.dispose();
       }
     }
-    //DomModifiers.alignBlocks();
+  }
+}
+
+/**
+ * Helper function per prendere tutti i blocchi nel workspace
+ */
+export function getAllTriggerInWorkspace() {
+  let triggers = [];
+  let workspace = getWorkspace();
+  for (var key in workspace.blockDB_) {
+    if (checkInTriggerInfo(workspace.blockDB_[key])) {
+      triggers.push(workspace.blockDB_[key]);
+    }
+  }
+  return triggers;
+}
+
+/**
+ * Helper function
+ */
+function getBlocksInRule() {
+  let workspace = getWorkspace();
+  let blocksInRule = workspace.getAllBlocks();
+  return blocksInRule;
+}
+
+/**
+ * Helper function
+ */
+export function createRuleBlocksObj() {
+  "use strict";
+  const blocksInRule = getBlocksInRule();
+  let resultObj = {
+    triggers: [],
+    triggers_op: [],
+    actions: [],
+    actions_op: [],
+    triggersRealName: [],
+    actionsRealName: []
+  };
+  for (let i = 0; i < blocksInRule.length; i++) {
+    if (checkInTriggerInfo(blocksInRule[i])) {
+      resultObj.triggers.push(blocksInRule[i].name);
+      resultObj.triggersRealName.push(blocksInRule[i].type);
+    }
+    else if (checkInTriggerOperators(blocksInRule[i])) {
+      resultObj.triggers_op.push(blocksInRule[i].type);
+    }
+    else if (checkInActionInfo(blocksInRule[i])) {
+      resultObj.actions.push(blocksInRule[i].name);
+      resultObj.actionsRealName.push(blocksInRule[i].type);
+    }
+    else if (checkInActionOperators(blocksInRule[i])) {
+      resultObj.actions_op.push(blocksInRule[i].type);
+    }
+  }
+  return resultObj;
+}
+
+/**
+ * TODO
+ * @param {*} ruleElementsObj 
+ */
+export function createRuleBlocksStr(ruleElementsObj) {
+  console.log(ruleElementsObj);
+  return ruleElementsObj;
+}
+
+/**
+ * Converte gli elementi nel campo triggersStr in un array, lo appende all'
+ * oggetto regola passato
+ * @param {*} rule 
+ */
+export function triggerStrToObj(rule) {
+  let triggersStr = rule.trigger_list;
+  let triggers = triggersStr.split(",");
+  rule.triggers_obj = triggers;
+  return rule;
+}
+
+/**
+ * Converte gli elementi nel campo actionsStr in un array, lo appende all'
+ * oggetto regola passato
+ * @param {*} rule 
+ */
+export function actionStrToObj(rule) {
+  let actionsStr = rule.action_list;
+  let actions = actionsStr.split(",");
+  rule.actions_obj = actions;
+  return rule;
+}
+
+/** //TODO: currentUser non viene più usato, si lavora solo con lo storage
+ *  tutte queste funzioni sono duplicate di login e da rimuovere
+ * Controlla se è settato un user nel local storage, se lo è salva nell'user
+ * corrente e mostra il nome
+ */
+function localStorageChecker() {
+  let user = window.localStorage.getItem('user');
+  if (user) {
+    currentUser = user;
+    document.getElementById('user-name').innerHTML = "Logged as: " + currentUser;
+  }
+}
+
+/**
+ * Salve l'user name nel local storage
+ * @param {*} userName 
+ */
+export function saveUserToLocal(userName) {
+  window.localStorage.setItem('user', userName);
+  localStorageChecker();
+}
+
+/**
+ * 
+ */
+export function removeUserFromLocal() {
+  localStorage.removeItem("user");
+}
+
+/**
+ * Restituisce l'user name attualmente salvato nel localstorage
+ */
+export function getUserName() {
+  return currentUser;
+}
+
+/**
+ * Helper function
+ */
+export function setLastBlock(block) {
+  lastBlock = block;
+}
+
+/**
+ * Helper function
+ */
+export function getLastBlock() {
+  return lastBlock;
+}
+
+/**
+ * Helper function
+ */
+export function setLastBlocklyEvent(event) {
+  lastBlocklyEvent = event;
+}
+
+/**
+ * Helper function
+ */
+export function getLastBlocklyEvent() {
+  return lastBlocklyEvent;
+}
+
+/**
+ * Helper function
+ */
+export function getRevertPossibility() {
+  return revertPossibility;
+}
+
+/**
+ * Helper function
+ */
+export function setRevertPossibility(val) {
+  revertPossibility = val;
+}
+
+/**
+ * Helper function: clears the secondary workspace
+ */
+export function clearSuggestionWorkspace() {
+  let secondWorkspace = getSuggestionWorkspace();
+  let allSuggestedBlocks = secondWorkspace.getAllBlocks(false);
+  allSuggestedBlocks.forEach(e => e.dispose());
+}
+
+export function blockToDom(xml) {
+  return (Blockly.Xml.blockToDom(xml));
+}
+
+/**
+ * 
+ * @param {*} allElementAtt 
+ */
+function convertElementAttInArr(allElementAtt) {
+  let arrayed = [];
+  allElementAtt.forEach(el => {
+    let row = [];
+    row.push(el.element_name);
+    row.push(el.element_type);
+    row.push(el.action_type);
+    row.push(el.trigger_type);
+    row.push(el.link_type);
+    row.push(el.negation);
+    row.push(el.next_element);
+    arrayed.push(row);
+  })
+  return arrayed;
+};
+
+/**
+ * setter 
+ */
+export function changeRecommendationType() {
+  if (recommendationType === "Step by step recommendations") {
+    recommendationType = "Full rule recommendations";
+  }
+  else {
+    recommendationType = "Step by step recommendations";
+  }
+  console.log(recommendationType);
+}
+
+/**
+ * setter 
+ */
+export function setRecommendationType(type) {
+  if (type === "step") {
+
+    recommendationType = "Step by step recommendations";
+  }
+  else if (type === "full") {
+    recommendationType = "Full rule recommendations";
+  }
+  else {
+    recommendationType = "None";
+  }
+  suggestorTypeChanged();
+  console.log(recommendationType);
+}
+
+
+/**
+ * 
+ * change the recType var
+ */
+function suggestorTypeChanged() {
+  errorMessages.changeRecTypeDiv();
+}
+
+
+/**
+* getter
+*/
+export function getRecType() {
+  return recommendationType;
+}
+
+/** Not used because fucks up everything. Fuck blockly
+ * Add the second "time" field from a dateTime block when the "between" op. 
+ * is selected
+ * @param {*} parent 
+ */
+export function addToInputsFromEventTime(block) {
+
+/*
+  let inputNot = block.getInput("NOT_INPUT");
+  if (inputNot) {
+    inputNot.dispose();
+  }
+  */
+      block.appendDummyInput("BETWEEN_TIMES")
+        .appendField(" and ");
+
+      //block.appendDummyInput("END_TIME_LABEL")
+       // .appendField("end: ");
+      block.appendDummyInput("END_TIME_HOUR")
+        .appendField(new Blockly.FieldDropdown([["select", "none"], ["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"],
+        ["04", "04"], ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"], ["10", "10"],
+        ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"], ["15", "15"], ["16", "16"], ["17", "17"],
+        ["18", "18"], ["19", "19"], ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"]]), "END_HOURS");
+      block.appendDummyInput("END_TIME_MIN")
+        .appendField(new Blockly.FieldDropdown([["select", "none"],["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"], ["04", "04"],
+        ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"],
+        ["10", "10"], ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"],
+        ["15", "15"], ["16", "16"], ["17", "17"], ["18", "18"], ["19", "19"],
+        ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"], ["24", "24"],
+        ["25", "25"], ["26", "26"], ["27", "27"], ["28", "28"], ["29", "29"],
+        ["30", "30"], ["31", "31"], ["32", "32"], ["33", "33"], ["34", "34"],
+        ["35", "35"], ["36", "36"], ["37", "37"], ["38", "38"], ["39", "39"],
+        ["40", "40"], ["41", "41"], ["42", "42"], ["43", "43"], ["44", "44"],
+        ["45", "45"], ["46", "46"], ["47", "47"], ["48", "48"], ["49", "49"],
+        ["50", "50"], ["51", "51"], ["52", "52"], ["53", "53"], ["54", "54"],
+        ["55", "55"], ["56", "56"], ["57", "57"], ["58", "58"], ["59", "59"]
+        ]), "END_MINS");
+
+   /*     
+        let checkbox = new Blockly.FieldCheckbox("false", function (pxchecked) {
+          this.sourceBlock_.updateShape_(pxchecked);
+        });
+      block.appendDummyInput()
+        .appendField(" NOT: ")
+        .appendField(checkbox, 'not_input');
+*/
+  block.appendDummyInput("dummy");
+  block.removeInput("dummy"); //force block reload
+
+}
+/**
+ * Remove the second "time" field from a dateTime block when the "between" op. 
+ * is not selected
+ * @param {*} parent 
+ */
+export function removeToInputsFromEventTime(parent) {
+  let inputHour = parent.getInput("END_TIME_HOUR");
+  if (inputHour) {
+    inputHour.dispose();
+  }
+  let inputMin = parent.getInput("END_TIME_MIN");
+  if (inputMin) {
+    inputMin.dispose();
+  }
+  let inputLabelEnd = parent.getInput("END_TIME_LABEL");
+  if (inputLabelEnd) {
+    inputLabelEnd.dispose();
+  }
+  let inputLabelStart = parent.getInput("START_TIME_LABEL");
+  if (inputLabelStart) {
+    inputLabelStart.dispose();
+  }
+  let andText = parent.getInput("BETWEEN_TIMES");
+  if (andText) {
+    andText.dispose();
   }
 
-  /**
-   * 
-   */
-  export function eventChange() {
-    let blockId = getClickedEventConditionBlock();
-    let workspace = getWorkspace();
-    let block = workspace.blockDB_[blockId];
-    let parent = block.getParent();
-    block.dispose();
-    let newBlock = myWorkspace.newBlock('event');
-    newBlock.initSvg();
-    newBlock.render();
-    parent.getInput("TRIGGER_TYPE").connection.connect(newBlock.outputConnection);
-    ModalManager.modalEventConditionChangeClose();
+  parent.appendDummyInput("dummy");
+  parent.removeInput("dummy"); //force block reload
+}
+
+
+/**
+ * 
+ */
+export function removeUnusedInputsFromSecondaryWorkspace() {
+  "use strict";
+  let workspace = getSuggestionWorkspace();
+  let blocks = workspace.getAllBlocks();
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].type === "event") {
+      let parent = blocks[i].getParent();
+      if (parent && parent.name === "Time") {
+        removeToInputsFromEventTime(parent);
+      }
+    }
   }
+  //DomModifiers.alignBlocks();
+}
 
-  /**
-   * 
-   */
-  export function conditionChange() {
-    let blockId = getClickedEventConditionBlock();
-    let workspace = getWorkspace();
-    let block = workspace.blockDB_[blockId];
-    let parent = block.getParent();
-    block.dispose();
-    let newBlock = myWorkspace.newBlock('condition');
-    newBlock.initSvg();
-    newBlock.render();
-    parent.getInput("TRIGGER_TYPE").connection.connect(newBlock.outputConnection);
-    ModalManager.modalEventConditionChangeClose();
+/**
+ * 
+ */
+export function eventChange() {
+  let blockId = getClickedEventConditionBlock();
+  let workspace = getWorkspace();
+  let block = workspace.blockDB_[blockId];
+  let parent = block.getParent();
+  block.dispose();
+  let newBlock = myWorkspace.newBlock('event');
+  newBlock.initSvg();
+  newBlock.render();
+  parent.getInput("TRIGGER_TYPE").connection.connect(newBlock.outputConnection);
+  ModalManager.modalEventConditionChangeClose();
+}
+
+/**
+ * 
+ */
+export function conditionChange() {
+  let blockId = getClickedEventConditionBlock();
+  let workspace = getWorkspace();
+  let block = workspace.blockDB_[blockId];
+  let parent = block.getParent();
+  block.dispose();
+  let newBlock = myWorkspace.newBlock('condition');
+  newBlock.initSvg();
+  newBlock.render();
+  parent.getInput("TRIGGER_TYPE").connection.connect(newBlock.outputConnection);
+  ModalManager.modalEventConditionChangeClose();
+}
+
+/**
+ * 
+ */
+export function getClickedEventConditionBlock() {
+  return clickedEventConditionBlock;
+}
+
+
+/**
+ * 
+ * @param {*} blockId 
+ */
+export function setClickedEventConditionBlock(blockId) {
+  clickedEventConditionBlock = blockId;
+}
+
+/**
+ * Show the "event and event" modal if two events are connected in "AND". Check 
+ * only the last inserted block with the previous one. 
+ * @param {*} block 
+ */
+export function checkEventEventOnlyPrev(block) {
+  let workspace = getWorkspace();
+  let ruleSequence = getRuleSequence();
+  let triggersWithId = ruleSequence.triggersWithId;
+  if (triggersWithId.length > 1) {
+    let previousLast = triggersWithId[triggersWithId.length - 2];
+    let previousLastBlock = workspace.getBlockById(previousLast.id);
+    if (checkIfEventInChild(previousLastBlock)) {
+      let nextOp = previousLastBlock.getNextBlock();
+      if (nextOp && nextOp.type === "and") {
+        MicroModal.show("modal-event-event");
+      }
+    }
   }
-
-  /**
-   * 
-   */
-  export function getClickedEventConditionBlock() {
-    return clickedEventConditionBlock;
-  }
+}
 
 
-  /**
-   * 
-   * @param {*} blockId 
-   */
-  export function setClickedEventConditionBlock(blockId) {
-    clickedEventConditionBlock = blockId;
-  }
-
-  /**
-   * Show the "event and event" modal if two events are connected in "AND". Check 
-   * only the last inserted block with the previous one. 
-   * @param {*} block 
-   */
-  export function checkEventEventOnlyPrev(block) {
-    let workspace = getWorkspace();
-    let ruleSequence = getRuleSequence();
-    let triggersWithId = ruleSequence.triggersWithId;
-    if (triggersWithId.length > 1) {
-      let previousLast = triggersWithId[triggersWithId.length - 2];
-      let previousLastBlock = workspace.getBlockById(previousLast.id);
-      if (checkIfEventInChild(previousLastBlock)) {
-        let nextOp = previousLastBlock.getNextBlock();
+/**
+ * Show the "event and event" modal if two events are connected in "AND". Check 
+ * all the rule sequence. Give warning even if blocks are not connected.
+ * @param {*} block 
+ */
+export function checkEventEvent(eventBlock) {
+  let workspace = getWorkspace();
+  let ruleSequence = getRuleSequence();
+  let triggersWithId = ruleSequence.triggersWithId;
+  if (triggersWithId.length > 1) {
+    for (let i = 0; i < triggersWithId.length; i++) {
+      let actualBlockId = triggersWithId[i].id;
+      let actualBlock = workspace.getBlockById(actualBlockId);
+      if (checkIfEventInChilds(actualBlock)) {
+        let nextOp = actualBlock.getNextBlock();
         if (nextOp && nextOp.type === "and") {
-          MicroModal.show("modal-event-event");
-        }
-      }
-    }
-  }
-
-
-  /**
-   * Show the "event and event" modal if two events are connected in "AND". Check 
-   * all the rule sequence. Give warning even if blocks are not connected.
-   * @param {*} block 
-   */
-  export function checkEventEvent(eventBlock) {
-    let workspace = getWorkspace();
-    let ruleSequence = getRuleSequence();
-    let triggersWithId = ruleSequence.triggersWithId;
-    if (triggersWithId.length > 1) {
-      for (let i = 0; i < triggersWithId.length; i++) {
-        let actualBlockId = triggersWithId[i].id;
-        let actualBlock = workspace.getBlockById(actualBlockId);
-        if (checkIfEventInChilds(actualBlock)) {
-          let nextOp = actualBlock.getNextBlock();
-          if (nextOp && nextOp.type === "and") {
-            if (actualBlock.id !== eventBlock.parentBlock_.id) {
-              MicroModal.show("modal-event-event");
-              break;
-            }
-            //let nextBlock = nextOp.getNextBlock();
-            //if (nextBlock && checkIfEventInChilds(nextBlock)) {
-            // MicroModal.show("modal-event-event");
-            //break;
-            //}
+          if (actualBlock.id !== eventBlock.parentBlock_.id) {
+            MicroModal.show("modal-event-event");
+            break;
           }
+          //let nextBlock = nextOp.getNextBlock();
+          //if (nextBlock && checkIfEventInChilds(nextBlock)) {
+          // MicroModal.show("modal-event-event");
+          //break;
+          //}
         }
       }
     }
   }
+}
 
-  /**
-   * 
-   * @param {*} block 
-   */
-  function checkIfEventInChilds(block) {
-    for (let i = 0; i < block.childBlocks_.length; i++) {
-      console.log(block.childBlocks_[i])
-      if (block.childBlocks_[i].type === "event") {
-        return true;
-      }
-    };
-    return false;
-  }
+/**
+ * 
+ * @param {*} block 
+ */
+function checkIfEventInChilds(block) {
+  for (let i = 0; i < block.childBlocks_.length; i++) {
+    console.log(block.childBlocks_[i])
+    if (block.childBlocks_[i].type === "event") {
+      return true;
+    }
+  };
+  return false;
+}
 
 
-  /**
-   * Check the position of the trigger type child block (it can be moved, due 
-   * to the possibility of changing the trigger type) 
-   * @param {*} block 
-   */
-  export function returnTriggerType(block) {
-    for (let i = 0; i < block.childBlocks_.length; i++) {
-      console.log(block.childBlocks_[i])
-      if (block.childBlocks_[i].type === "event" || block.childBlocks_[i].type === "condition") {
-        return block.childBlocks_[i].type;
-      }
-    };
-    return false;
-  }
+/**
+ * Check the position of the trigger type child block (it can be moved, due 
+ * to the possibility of changing the trigger type) 
+ * @param {*} block 
+ */
+export function returnTriggerType(block) {
+  for (let i = 0; i < block.childBlocks_.length; i++) {
+    console.log(block.childBlocks_[i])
+    if (block.childBlocks_[i].type === "event" || block.childBlocks_[i].type === "condition") {
+      return block.childBlocks_[i].type;
+    }
+  };
+  return false;
+}
 
-  /**
-   * Helper function
-   * @param {*} name 
-   */
-  function findInBooleanTriggers(triggerRealName){
-    return booleanTriggers.includes(triggerRealName) ? true : false;
-  }
+/**
+ * Helper function
+ * @param {*} name 
+ */
+function findInBooleanTriggers(triggerRealName) {
+  return booleanTriggers.includes(triggerRealName) ? true : false;
+}

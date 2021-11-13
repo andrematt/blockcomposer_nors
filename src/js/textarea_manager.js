@@ -1,4 +1,4 @@
-import {startRefineRule, getRecType} from "./main.js";
+import {getRecType, checkInTriggerInfo, checkInActionInfo} from "./main.js";
 
 /**
  *  Change the type of recommendation
@@ -17,39 +17,155 @@ export function changeRecTypeDiv(){
     }
 }
 
+/**
+ *
+ */
+function childNotContainsAndOr(block){
+    let notAndOr = true; 
+    block.childBlocks_.forEach( (e) => {
+        if (e.type === "and" || e.type === "or") { 
+            notAndOr = false;
+        }
+    })
+    return notAndOr;
+}
+
+/**
+ *
+ */
+function childNotContainsNot(block){
+    let notNegation = true; 
+    block.childBlocks_.forEach( (e) => {
+        if (e.type === "not_dynamic") { 
+            notNegation = false;
+        }
+    })
+    return notNegation;
+}
+
+/**
+ * This is not perfect, because when a block is deleted the focus pass on the 
+ * parent block, but at least it work. I can't understand how to get the parent 
+ * block of one in deleting, because when the "delete" block is captured, the 
+ * block has already been removed from the worspace, hence I can't retreive its
+ * parent. 
+ */
+export function showCorrectTextareaOperatorRemove(){
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+}
+
+/**
+ * Show the operators when a  
+ * @param {*} block 
+ */
+export function showCorrectTextareaOperatorCreate(block){
+if (checkInTriggerInfo(block)){
+    if (childNotContainsAndOr(block)){
+    document.getElementById("suggestor-and").removeAttribute("disabled"); 
+    document.getElementById("suggestor-or").removeAttribute("disabled"); 
+    }
+    else {
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    }
+    if (childNotContainsNot(block)){
+    document.getElementById("suggestor-not").removeAttribute("disabled"); 
+    }
+    else {
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+    }
+ }
+ else if (checkInActionInfo(block)){ //for the moment, just deselect all buttons. To be modified when action ops will be used
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+ }
+ else if(block.type === "not_dynamic"){ //call again showcorrect... on the parent element
+        if(block.parentBlock_){
+            showCorrectTextareaOperatorCreate(block.parentBlock_);
+        }
+
+    }
+    else if (block.type === "and" || block.type === "or"){ //call again showcorrect... on the parent element
+        if(block.parentBlock_){
+            showCorrectTextareaOperatorCreate(block.parentBlock_);
+        }
+
+    }
+   
+}
+
+/**
+ * 
+ * @param {*} block 
+ */
+export function showCorrectTextareaOperatorMove(block){
+if (checkInTriggerInfo(block)){
+    console.log(block)
+    if (childNotContainsAndOr(block)){
+    document.getElementById("suggestor-and").removeAttribute("disabled"); 
+    document.getElementById("suggestor-or").removeAttribute("disabled"); 
+    }
+    else {
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    }
+    if (childNotContainsNot(block)){
+    document.getElementById("suggestor-not").removeAttribute("disabled"); 
+    }
+    else {
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+    }
+ }
+ else if (checkInActionInfo(block)){ //for the moment, just deselect all buttons. To be modified when action ops will be used
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+ }
+ else if(block.type === "not_dynamic"){ //If a not/and/or is clicked/moved, don't show any possible next element
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+    }
+    else if (block.type === "and" || block.type === "or"){ ///If a not/and/or is clicked/moved, don't show any possible next element
+    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
+    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
+    }
+}
+
+
+
 
 /**
  * 
  */
 export function afterTriggerMessage(){
-    document.getElementById("suggestor-and").removeAttribute("disabled"); 
-    document.getElementById("suggestor-or").removeAttribute("disabled"); 
-    document.getElementById("suggestor-not").removeAttribute("disabled"); 
-    document.getElementById("suggestor-action").removeAttribute("disabled"); 
-    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-parallel").setAttribute("disabled", ""); 
      let text = `
-     Click on "AND", OR", "NOT" or "ACTION" to add the operator (if needed) and obtain more precise suggestions
+     Insert the trigger into the apposite space on the "Rule" block.
  `;
     document.getElementById('textarea-suggestion-expl').innerHTML = "";
     document.getElementById('textarea-suggestion-expl').innerHTML = text;
 }
 
+//fare listener per quando viene connesso un trigger al blocco trigger, poi per tutti gli altri casi (operatori, azioni..)
+export function afterTriggerConnectingToRuleMessage(){
+     let text = `
+    Modify the trigger proprieties, then add a trigger operator (and, or) if other triggers are needed, or chose an Action from the toolbox.
+     `
 
+    document.getElementById('textarea-suggestion-expl').innerHTML = "";
+    document.getElementById('textarea-suggestion-expl').innerHTML = text;
+}
 
 /**
  * 
  */
 export function afterTriggerOpMessage(){
-    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-action").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-parallel").setAttribute("disabled", ""); 
- 
  let text =  `
- Continue the editing of the trigger part selecting another trigger from the toolbox or clicking on a suggested trigger.
+ Continue the editing of the trigger part selecting another trigger from the toolbox.
     `;
     document.getElementById('textarea-suggestion-expl').innerHTML = "";
     document.getElementById('textarea-suggestion-expl').innerHTML = text;
@@ -59,14 +175,8 @@ export function afterTriggerOpMessage(){
  * 
  */
 export function afterNotMessage(){
-    document.getElementById("suggestor-and").removeAttribute("disabled"); 
-    document.getElementById("suggestor-or").removeAttribute("disabled"); 
-    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-action").removeAttribute("disabled"); 
-    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-parallel").setAttribute("disabled", ""); 
      let text = `
-     Click on "AND", OR" or "ACTION" to add the operator (if needed) and obtain more precise suggestions
+        La negazione sarà applicata a questo trigger. E' possibile specificare un intervallo temporale.  
  `;
     document.getElementById('textarea-suggestion-expl').innerHTML = "";
     document.getElementById('textarea-suggestion-expl').innerHTML = text;
@@ -87,14 +197,8 @@ export function oftenRuleEnds(){
  * 
  */
 export function afterActionMessage(){
-    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-action").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-sequential").removeAttribute("disabled"); 
-    document.getElementById("suggestor-parallel").removeAttribute("disabled"); 
-     let text = `
-     Click on "SEQUENTIAL" or "PARALLEL" to add the operator and obtain more precise suggestions
+    let text = `
+    Place the action into the apposite space in the "rule" block. 
  `;
     document.getElementById('textarea-suggestion-expl').innerHTML = "";
     document.getElementById('textarea-suggestion-expl').innerHTML = text;
@@ -104,12 +208,6 @@ export function afterActionMessage(){
  * 
  */
 export function afterActionOpMessage(){
-    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-action").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-parallel").setAttribute("disabled", "");
  let text =  `
  Continue the editing of the action part selecting another action from the toolbox or clicking on a suggested action.
     `;    
@@ -127,29 +225,18 @@ export function startActionEditing(){
     `;
     document.getElementById('textarea-suggestion-expl').innerHTML = "";
     document.getElementById('textarea-suggestion-expl').innerHTML = text;
-    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-action").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-parallel").setAttribute("disabled", "");
 }
 
 /**
  * 
  */
 export function startTriggerEditing(){
+
  let text =  `
- Start the editing of the trigger part selecting a trigger from the toolbox.
+ Start the editing of the rule by selecting a trigger or an action from the toolbox.
     `;
     document.getElementById('textarea-suggestion-expl').innerHTML = "";
     document.getElementById('textarea-suggestion-expl').innerHTML = text;
-    document.getElementById("suggestor-and").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-or").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-not").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-action").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-sequential").setAttribute("disabled", ""); 
-    document.getElementById("suggestor-parallel").setAttribute("disabled", "");
 }
 
 
@@ -160,6 +247,7 @@ export function startTriggerEditing(){
  */
 export function suggestorErrorMessages(errorType) {
   "use strict";
+  /*
     if (errorType === "noElements"){
     let text = "Can't generate suggestion: need at least 1 rule element inserted into the 'rule' block!"; 
     document.getElementById('textarea-alerts').innerHTML = "";
@@ -185,6 +273,7 @@ export function suggestorErrorMessages(errorType) {
     document.getElementById('textarea-alerts').innerHTML = "";
     document.getElementById('textarea-alerts').innerHTML = text;
   }
+  */
 }
 
 

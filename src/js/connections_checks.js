@@ -14,7 +14,7 @@ import {
 
   const availableNextStatements = {
     trigger : ["and", "or", "group", "not_dynamic"],
-    action: ["parallel_dynamic", "sequential", "parallel"],
+    action: ["parallel_dynamic", "sequential", "parallel", "action"],
     and : ["trigger"],
     or : ["trigger"],
     group : ["trigger"],

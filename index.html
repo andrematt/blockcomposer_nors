@@ -20,13 +20,15 @@
           <h1>Block Rule Composer <i class="fas fa-puzzle-piece"></i></h1>
         </div>
           <div class="splash-text"> Welcome to Block Rule Composer </div>
-          <div class="splash-text">Please login using a Google account: </div>
+          <div class="splash-text">Please insert a user name: </div>
           <div class="splash-text">
-              <span id="google-signin" class="g-signin2"></span>
+              <input id="userNameText" type="text">
           </div>
           <div class="splash-text">
+            <!--
               <span><button class ="pure-button disabled" id="clickable-logout" disabled>Logout</button></span>
-              <span><button class ="pure-button disabled" id="clickable-login"  disabled onclick="location.href='http://localhost:8080/editor.html'";>Go to editor</button></span>
+            -->
+              <span><button class ="pure-button" id="clickable-login";>Go to editor</button></span>
                <!--
           </div>
             <a href ="editor.html" id="clickable-login" class="disabled">Go to editor</a>
@@ -54,17 +56,25 @@
   <script src="https://kit.fontawesome.com/6f52fd3181.js"></script>
   <script type="module">
     import * as Login from './src/js/login.js';
-    const googleLoginButton = document.getElementById("google-signin");
-    googleLoginButton.addEventListener("click", Login.login, false);
+    const loginButton = document.getElementById("clickable-login");
+    loginButton.addEventListener("click", loginWrapper, false);
 
-    // API call for Google login and logout
-   // const loadEditor = document.getElementById("clickable-login");
-   // loadEditor.addEventListener("click", Login.loadEditor, false);
+   // const logoutButton = document.getElementById("clickable-logout");
+   // logoutButton.addEventListener("click", Login.logout, false);
     
-    const googleLogoutButton = document.getElementById("clickable-logout");
-    googleLogoutButton.addEventListener("click", Login.logout, false);
+    function loginWrapper(){
+      let user = document.getElementById("userNameText").value;
+      if(user){ // Se serve un sistema di login vero, sanificare l'input
+        Login.saveUserToLocal(user)
+        location.href='editor.html';
+      }
+    }
 
     //check se utente è già loggato, es se fa refresh
-    Login.checkLogin();
+    let user = Login.getUserName();
+    //Login.checkLogin(); // check per far abilitare / disabilitare i tasti login e logout. Attualmente non in uso.
+    if (user){
+      document.getElementById('userNameText').value = user;
+    }
   </script>
     </html>

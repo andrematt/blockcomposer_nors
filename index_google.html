@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+
+<html>
+<meta name="google-signin-client_id" content="364074354291-pfkuf67b2kv1gu747i396bbcil0nc3f9.apps.googleusercontent.com">
+<link rel="icon" href="./src/img/favicon.ico">
+
+<head>
+
+</head>
+
+<body>
+
+
+  <div class="splash-login-container">
+
+    <div class="splash-login">
+
+      <div class="login-text">
+        <div class="site-title-container">
+          <h1>Block Rule Composer <i class="fas fa-puzzle-piece"></i></h1>
+        </div>
+          <div class="splash-text"> Welcome to Block Rule Composer </div>
+          <div class="splash-text">Please login using a Google account: </div>
+          <div class="splash-text">
+              <span id="google-signin" class="g-signin2"></span>
+          </div>
+          <div class="splash-text">
+              <span><button class ="pure-button disabled" id="clickable-logout" disabled>Logout</button></span>
+              <span><button class ="pure-button disabled" id="clickable-login"  disabled onclick="location.href='https://giove.isti.cnr.it/demo/pat/nors/editor.html'";>Go to editor</button></span>
+               <!--
+          </div>
+            <a href ="editor.html" id="clickable-login" class="disabled">Go to editor</a>
+          </div>
+             -->
+          </div>
+      </div>
+
+      <div class="login-img">
+        <div class="splash-background"><img class="splash-img" src="src/img/network.png" alt="background image"></div>
+      </div>
+
+    </div>
+
+  </div>
+
+
+    </body>
+
+  <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/pure-min.css">
+
+  <link rel="stylesheet" type="text/css" href="src/css/index.css">
+  <script src="node_modules/jquery/dist/jquery.js"></script>
+  <script src="https://apis.google.com/js/platform.js" async defer></script>
+  <script src="https://kit.fontawesome.com/6f52fd3181.js"></script>
+  <script type="module">
+    import * as Login from './src/js/login.js';
+    const googleLoginButton = document.getElementById("google-signin");
+    googleLoginButton.addEventListener("click", Login.login, false);
+
+    // API call for Google login and logout
+   // const loadEditor = document.getElementById("clickable-login");
+   // loadEditor.addEventListener("click", Login.loadEditor, false);
+    
+    const googleLogoutButton = document.getElementById("clickable-logout");
+    googleLogoutButton.addEventListener("click", Login.logout, false);
+
+    //check se utente è già loggato, es se fa refresh
+    Login.checkLogin();
+  </script>
+    </html>

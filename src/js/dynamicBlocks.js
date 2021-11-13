@@ -38,10 +38,10 @@ Blockly.Blocks['not_dynamic'] = {
     });
     this.setMovable(false);
     this.blockType = "not_dynamic";
-    this.appendDummyInput()
-      .appendField("Negation is applied to this block");
+    //this.appendDummyInput()
+     // .appendField("Negation is applied to this block");
     this.appendDummyInput() //remove these 2 field to have a "static" not behaviour (without "when")
-      .appendField("(Optional) when: ")
+      .appendField("(Opzionale) Quando? ")
       .appendField(checkbox, 'when_input');
 
     this.setPreviousStatement(true);
@@ -68,20 +68,14 @@ Blockly.Blocks['not_dynamic'] = {
     // Aggiunge o rimuove i value inputs
     if (passedValue) {
       //if(whenInput){
-      this.appendDummyInput("when_input_day")
-        .appendField(new Blockly.FieldCheckbox("false"), 'day_check')
-        .appendField("Day: ")
-
-        .appendField(new Blockly.FieldDate(), 'day_value');
 
       this.appendDummyInput("when_input_start_hour")
-        .appendField(new Blockly.FieldCheckbox("false"), 'start_time_check')
-        .appendField("Start time: ")
-        .appendField(new Blockly.FieldDropdown([["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"],
+        .appendField("Dalle: ")
+        .appendField(new Blockly.FieldDropdown([["Inserisci", "none"],["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"],
         ["04", "04"], ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"], ["10", "10"],
         ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"], ["15", "15"], ["16", "16"], ["17", "17"],
-        ["18", "18"], ["19", "19"], ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"]]), "Hours")
-        .appendField(new Blockly.FieldDropdown([["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"], ["04", "04"],
+        ["18", "18"], ["19", "19"], ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"]]), "Start_Hours")
+        .appendField(new Blockly.FieldDropdown([["Inserisci","none"],["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"], ["04", "04"],
         ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"],
         ["10", "10"], ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"],
         ["15", "15"], ["16", "16"], ["17", "17"], ["18", "18"], ["19", "19"],
@@ -93,16 +87,15 @@ Blockly.Blocks['not_dynamic'] = {
         ["45", "45"], ["46", "46"], ["47", "47"], ["48", "48"], ["49", "49"],
         ["50", "50"], ["51", "51"], ["52", "52"], ["53", "53"], ["54", "54"],
         ["55", "55"], ["56", "56"], ["57", "57"], ["58", "58"], ["59", "59"]
-        ]), "Mins");
+        ]), "Start_Mins");
 
       this.appendDummyInput("when_input_end_hour")
-        .appendField(new Blockly.FieldCheckbox("false"), 'end_time_check')
-        .appendField("End time: ")
-        .appendField(new Blockly.FieldDropdown([["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"],
+        .appendField("Alle: ")
+        .appendField(new Blockly.FieldDropdown([["Inserisci", "none"],["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"],
         ["04", "04"], ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"], ["10", "10"],
         ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"], ["15", "15"], ["16", "16"], ["17", "17"],
-        ["18", "18"], ["19", "19"], ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"]]), "Hours")
-        .appendField(new Blockly.FieldDropdown([["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"], ["04", "04"],
+        ["18", "18"], ["19", "19"], ["20", "20"], ["21", "21"], ["22", "22"], ["23", "23"]]), "End_Hours")
+        .appendField(new Blockly.FieldDropdown([["Inserisci", "none"],["00", "00"], ["01", "01"], ["02", "02"], ["03", "03"], ["04", "04"],
         ["05", "05"], ["06", "06"], ["07", "07"], ["08", "08"], ["09", "09"],
         ["10", "10"], ["11", "11"], ["12", "12"], ["13", "13"], ["14", "14"],
         ["15", "15"], ["16", "16"], ["17", "17"], ["18", "18"], ["19", "19"],
@@ -114,10 +107,14 @@ Blockly.Blocks['not_dynamic'] = {
         ["45", "45"], ["46", "46"], ["47", "47"], ["48", "48"], ["49", "49"],
         ["50", "50"], ["51", "51"], ["52", "52"], ["53", "53"], ["54", "54"],
         ["55", "55"], ["56", "56"], ["57", "57"], ["58", "58"], ["59", "59"]
-        ]), "Mins");
+        ]), "End_Mins");
       //this.appendValueInput('when_input_day').appendField("Day: ");
       //this.appendValueInput('when_input_start_hour').appendField("Start time: ");
       //this.appendValueInput('when_input_end_hour').appendField("End time: ");
+      this.appendDummyInput("when_input_day")
+        .appendField("Giorno: ")
+
+        .appendField(new Blockly.FieldDate("(opzionale) Inserisci una data"), 'day_value');
     }
     else {
       if (this.getInput('when_input_day') && this.getInput('when_input_start_hour') && this.getInput('when_input_end_hour')) {
@@ -137,7 +134,7 @@ Blockly.Blocks['parallel_dynamic'] = {
     console.log("init parallel called");
     this.setInputsInline(true);
     this.blockType = "parallel_dynamic";
-    let myField = new Blockly.FieldNumber(this.lastValue, 1, 4, "BRANCHES", function (value) {
+    let myField = new Blockly.FieldNumber(this.lastValue, 2, 4, "BRANCHES", function (value) {
       if (this.sourceBlock_) {
         //aggiorna il numero di branches attuale
         this.sourceBlock_.previousValue = this.sourceBlock_.lastValue;
@@ -222,149 +219,3 @@ Blockly.Blocks['parallel_dynamic'] = {
   },
 
 };
-
-function ColourGradient() {
-
-  var svg = null;		/* SVG root Element */
-  var svgNS = null;	/* SVG namespace */
-  var defs = null;	/* SVG defs Element*/
-  var id = null;		/* Block Id */
-  
-/**
-   * Constructor inits SVG DOM.
-   */
-  var __construct = function() {
-      svg = document.getElementsByTagName("svg")[0];
-      defs = svg.getElementsByTagName("defs")[0];   
-      svgNS = svg.namespaceURI;
-  }()
-
-  /**
-   * Setting a horizontal colour gradient from the colour of this block
- * to the colour of the parent block.
- * 
- * @param {Blockly.Block} block Current block that has the starting colour for the gradient.
-   * @param {String} startColor Color as hex value for starting the gradient.
- * @param {String} endColor Color as hex value for ending the gradient.
- */
-  this.setHorizontalGradient = function(block, startColor, endColor) {
-      var parentBlock = block.getParent();
-  id = "gradient_" + parentBlock.id + "_" + block.id;
-  
-      var colors = {
-          start : (startColor) ? startColor : parentBlock.getColour(),
-          end : (endColor) ? endColor: block.getColour()
-      }; 
-
-      var parentBlockSvg = parentBlock.getSvgRoot().getElementsByClassName("blocklyPath")[0];
-      var gradientNode = document.getElementById(id);
-      var stops = [
-          { "offset" : "20%", "stop-color" : colors.start },
-          { "offset" : "80%", "stop-color" : colors.end }
-      ];
-
-      if (!gradientNode) {    /* Creating new linearGradient Node in SVG */
-          gradientNode = createGradient(stops, false); 
-      } else {                /* Updating linearGradient Node */
-          updateGradient(gradientNode, stops);
-      }
-      
-      parentBlockSvg.setAttribute("fill", "url('#" + id + "')");
-  };
-
-  /**
-   * Setting a vertical colour gradient of this block.
- * 
- * @param {Object} block Current block that has the starting colour for the gradient.
- * @param {Object} colors JSON with start and stop color for the gradient.
- * @param {Array} inputs Array with the names of the inputs that should be calculated for the height.
-   */
-  this.setVerticalGradient = function(block, colors, inputs) {
-      if (!block && !colors && !inputs)
-          return false;
-
-      id = "gradient_" + block.id;
-
-      /* Disabling because the ColourGradient updates the colour */
-      block.updateColour = function() {};
-
-      var blockSvg = block.getSvgRoot().getElementsByClassName("blocklyPath")[0];
-      var gradientNode = document.getElementById(id);
-      var height = 0;
-      var heightHundredth = 100 / block.getHeightWidth().height;
-      
-      inputs.forEach(function (entry) {
-          var input = block.getInput(entry);
-          if (input)
-              if (input.renderHeight)
-                  height += input.renderHeight;
-      });
-
-      height = heightHundredth * height;
-
-      var stops = [
-          { "offset" : (height - 5) + "%", "stop-color" : colors.start },
-          { "offset" : (height + 5) + "%", "stop-color" : colors.stop }
-      ];
-
-      if (!gradientNode) {    /* Creating new linearGradient Node in SVG */
-          gradientNode = createGradient(stops, true); 
-      } else {                /* Updating linearGradient Node */
-          updateGradient(gradientNode, stops);
-      }
-      
-      blockSvg.setAttribute("fill", "url('#" + id + "')");
-  };
-  
-  /**
-   * Updating existing gradient.
-   * 
-   * @param {Element} grad <linearGradient> SVG Element
-   * @param {Json} stops stop attributes
-   */
-  var updateGradient = function(grad, stops) {
-      var stopNodes = grad.getElementsByTagName("stop");
-             
-      for (var cnt = 0; cnt < stopNodes.length; cnt++) {
-          var attrs = stops[cnt];
-          var stop = stopNodes[cnt];
-
-          for (var attr in attrs) {
-              stop.setAttribute(attr, attrs[attr]);
-          }
-      }
-  }.bind(this);
-  
-  /**
-   * Creating linearGradient and appending it to <defs> in svg.
-   * 
-   * @param {Object} stops Json attributes  
-   * @param {bool} isVertical true vertical false horizontal
- * @return {Element} defs Returning defs element with the created linear gradients.
-   */
-  var createGradient = function(stops, isVertical) {
-      var grad  = document.createElementNS(svgNS, "linearGradient");
-      grad.setAttribute("id", id);
-      
-      if (isVertical) {
-          grad.setAttribute("x1", "0");
-          grad.setAttribute("x2", "0");
-          grad.setAttribute("y1", "1");
-          grad.setAttribute("y2", "0");
-      }
-
-      for (var i = 0; i < stops.length; i++) {
-          var attrs = stops[i];
-          var stop = document.createElementNS(svgNS, "stop");
-          
-          for (var attr in attrs) {
-              if (attrs.hasOwnProperty(attr)) 
-                  stop.setAttribute(attr, attrs[attr]);
-          }
-
-          grad.appendChild(stop);
-      }
-
-      return defs.appendChild(grad);
-  }.bind(this);
-}

@@ -1,4 +1,4 @@
-import {fireOnlySequenceRecNoDom, getRuleSequence} from "./main.js";
+//import {fireOnlySequenceRecNoDom, getRuleSequence} from "./main.js";
 
 let previousElementsToConsider_CPT = 2;
 let weight_CPT = 0.5;
@@ -6,11 +6,13 @@ let weight_NN = 1;
 let lastRec_CPT; 
 let lastRec_NN;
 let minimumConfidence_NN = 0.05;
-
+let numberOfPredictions_CPT = 5;
 
 /**
  * 
  */
+
+ /*
 export function whatIf_CPT(){
     let elementsInWorkspace = getRuleSequence();
     console.log(elementsInWorkspace);
@@ -20,6 +22,10 @@ export function whatIf_CPT(){
     let result = fireOnlySequenceRecNoDom(onlyElements);
     console.log(result);
     document.getElementById('prediction_rescored_CPT').innerHTML = elementsToConsider;
+}
+*/
+export function getNumberOfPredictions_CPT(){
+    return numberOfPredictions_CPT;
 }
 
 /**
@@ -62,6 +68,13 @@ export function getLastRec_NN(){
  */
 export function getMinimumConfidence_NN(){
     return minimumConfidence_NN;
+}
+
+/**
+ * setter
+ */
+export function setNumberOfPredictions_CPT(value){
+    numberOfPredictions_CPT = value;
 }
 
 /**

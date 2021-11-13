@@ -1,0 +1,11 @@
+# Dependency directories
+node_modules/
+
+# Other project dirs 
+nors/
+pat-node-server/
+pat-sqlite-server/
+.history/
+
+# Settings
+.vscode/

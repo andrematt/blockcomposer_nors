@@ -10,40 +10,9 @@ import {
   from "./main.js";
 import {getUserName} from "./login.js";
 
-///////////////////////////// dom_modifiers ////////////////////////////////////
-/* contains all the functions to add/remove/modifiy the blocks in the 
- *  workspaces.
-*/
+// contains all the functions to add/remove/modifiy the blocks in the 
+// workspaces.
 
-/**
- * Updates the block and the XML of a trigger, when the negation is added via 
- * textbox 
- * @param {*} block 
- */
-export function addNegationToBlock(block){
-  console.log("ADD NEGATION TO BLOCK")
-  let xml = blockToDom(block); //when updating a block "from the outside" (not using listeners..), you need to update
-  xml.setAttribute('not_input', true); //also the xml of the block
-  block.domToMutation(xml);
-  let inputField = block.getField("not_input");
-  inputField.setValue(true);
-  block.render();
-}
-
-/**
- * 
- * @param {*} block 
- * @param {*} operator 
- */
-export function addOperatorToBlock(block, operator){
-  let workspace = getWorkspace();
-  let blockToAppend = workspace.newBlock(operator);
-  blockToAppend.initSvg();
-  blockToAppend.render();
-  let blockConnection = block.nextConnection;
-  let otherConnection = blockToAppend.previousConnection;
-  blockConnection.connect(otherConnection);
-}
 
 /**
  * 
@@ -163,16 +132,52 @@ export function removeActionRevert() {
 }
 
 /**
+ * Useful for debugging 
+ * @param {*} rules 
+ */
+function printIdAndGoal(rules){
+
+  let results = [];
+  rules.forEach( (e) => {
+    let result = {}
+    result.id = e.id;
+    result.name = e.rule_name;
+    let e_json = JSON.parse(e.rule_obj_str);
+    let rule_goal = e_json.goal;
+    let rule_prioritiy = e_json.priority
+    result.goal = rule_goal;
+    result.priority = rule_prioritiy;
+    results.push(result);
+  })
+    let results_string = JSON.stringify(results)
+    let blob = new Blob([results_string], {type:"application/json;charset=utf-8"});
+    console.log(results)
+    var url = URL.createObjectURL(blob);
+    var elem = document.createElement("a");
+    elem.href = url;
+    elem.download = "test.json";
+    document.body.appendChild(elem);
+    elem.click();
+    document.body.removeChild(elem);
+}
+
+/**
  * Appende la lista di regole salvate recuperate dal db nella finestra modale.
  * Quando un elemento nella lista viene cliccato, chiama ruleToWorkspace
  * @param {*} domElement 
  */
-export async function appendRulesList(domElement) {
-  "use strict";
+export async function appendRulesList(domElement, isSudo = false) {
   let user = getUserName();
-  let rules = await getAllFromDBUser(user).then();
+  let rules;
+  if(isSudo){
+  rules = await getAllFromDB(user).then();
+  }
+  else {
+  rules = await getAllFromDBUser(user).then();
+  }
   console.log(rules);
   if (rules && rules.length > 0) {
+    //printIdAndGoal(rules) //download all rules in JSON for debugging
     //rimuove i nodi precedenti
     let myNode = document.getElementById(domElement);
     while (myNode.firstChild) {
@@ -295,12 +300,28 @@ function highlightRule() {
  * Chiamata quando un elemento nella lista viene cliccato. Trasforma la regola
  * salvata in formato TARE in blocchi e la aggiunge al workspace.  
  */
+export function xmlFileToWorkspace(rule) {
+  "use strict";
+  //console.log(rule);
+  if (rule) {
+    let workspace = getWorkspace();
+    let xmlDoc = new DOMParser().parseFromString(rule, "text/xml");
+    //console.log(xmlDoc);
+    Blockly.Xml.domToWorkspace(xmlDoc.firstChild, workspace);
+  }
+}
+
+/**
+ * Chiamata quando un elemento nella lista viene cliccato. Trasforma la regola
+ * salvata in formato TARE in blocchi e la aggiunge al workspace.  
+ */
 export function ruleToWorkspace(rule) {
   "use strict";
   //console.log(rule);
   if (rule[0].id) {
     let workspace = getWorkspace();
     let xml_str = rule[0].rule_xml_str;
+    console.log(xml_str);
     let xmlDoc = new DOMParser().parseFromString(xml_str, "text/xml");
     //console.log(xmlDoc);
     Blockly.Xml.domToWorkspace(xmlDoc.firstChild, workspace);

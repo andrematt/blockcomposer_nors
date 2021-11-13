@@ -31,12 +31,12 @@
             -->
 
               <button id="button-home" class="pure-button" type="button"
-                onclick="location.href='http://localhost:8080/index.html'" ;>
+                onclick="location.href='https://giove.isti.cnr.it/demo/pat/nors/index.html'" ;>
                 Back to home
               </button>
               <!--
               <button id="button-modal-export" class="pure-button" type="button">
-                Export XML
+                Export workspace
               </button>
             -->
               <button id="button-modal-check" class="pure-button" type="button">
@@ -49,8 +49,16 @@
                 Save rule
               </button>
               <button data-micromodal-trigger="modal-2" id="button-modal-get" class="pure-button" type="button">
-                Get rules
+                My rules
               </button>
+               <!--
+               <button data-micromodal-trigger="modal-2" id="button-modal-get-all" class="pure-button" type="button">
+                All rules
+              </button>
+               <button data-micromodal-trigger="modal-import" id="button-modal-import" class="pure-button" type="button">
+                Import rule
+              </button>
+            -->
             </div>
           </div>
           <!--
@@ -96,25 +104,10 @@
                 NOT
               </button>
             </div>
-            <div>
-              <button id="suggestor-action" class="pure-button" type="button" disabled>
-                ACTION
-              </button>
-            </div>
-            <div>
-              <button id="suggestor-sequential" class="pure-button" type="button" disabled>
-                SEQUENTIAL
-              </button>
-            </div>
-            <div>
-              <button id="suggestor-parallel" class="pure-button" type="button" disabled>
-                PARALLEL
-              </button>
-            </div>
           </div>
         </div>
 
-        <div class="textarea-div">
+        <div class="textarea-div" >
           <div id="textarea-suggestion-expl"> </div>
         </div>
 
@@ -132,10 +125,10 @@
         <div class="pure-menu pure-menu-horizontal">
           <ul class="pure-menu-list">
             <li class="pure-menu-item">
-              <a href="#" class="pure-menu-link" id="suggestor-step-by-step">Step-by-step</a>
+              <a href="#" class="pure-menu-link disabled-element" id="suggestor-step-by-step">Step-by-step</a>
             </li>
             <li class="pure-menu-item">
-              <a href="#" class="pure-menu-link" id="suggestor-full-rule">Full rule</a>
+              <a href="#" class="pure-menu-link disabled-element" id="suggestor-full-rule">Full rule</a>
             </li>
             <li class="pure-menu-item">
               <a href="#" class="pure-menu-link" id="suggestor-none">None</a>
@@ -143,14 +136,14 @@
           </ul>
         </div>
         <div id="rec-type-text-div" class="rec-type-text">
-          Recommendation type: step-by-step
+          Suggestions disabled
         </div>
       </div>
     </div>
   </div>
 
   <xml id="toolbox" style="display: hidden">
-    <category name="Rule blocks">
+    <category name="Rule block">
       <block type="rule"></block>
     </category>
 
@@ -165,8 +158,6 @@
     <category name="Action list">
     </category>
 
-    <category name="Action operators">
-    </category>
 
   </xml>
 
@@ -224,7 +215,7 @@
       <div class="modal__container" role="dialog" aria-modal="true" aria-labelledby="modal-2-title">
         <header class="modal__header">
           <h2 class="modal__title" id="modal-2-title">
-            Get rule
+            My rules
           </h2>
           <button class="modal__close" aria-label="Close modal" data-micromodal-close></button>
         </header>
@@ -237,10 +228,8 @@
         <footer class="modal__footer">
           <div id="modal-footer-buttons-container">
             <div id="modal-footer-left-buttons">
-              <button id="button-confirm-get" class="pure-button" data-micromodal-close aria-label="Get this rule">Load
-                rule</button>
-              <button id="button-delete" class="pure-button" data-micromodal-close aria-label="Delete this rule">Delete
-                rule</button>
+              <button id="button-confirm-get" class="pure-button" data-micromodal-close aria-label="Get this rule">Load rule</button>
+              <button id="button-delete" class="pure-button" data-micromodal-close aria-label="Delete this rule">Delete rule</button>
               <button id="button-export-all" class="pure-button" data-micromodal-close
                 aria-label="Export all rules">Export
                 all rules
@@ -250,6 +239,36 @@
               <button id="button-deactivate" class="pure-button" data-micromodal-close
                 aria-label="Deactivate this rule">Deactivate rule</button>
             </div>
+            <div class="modal-footer-right-buttons">
+              <button class="pure-button" data-micromodal-close aria-label="Close this dialog window">Close</button>
+            </div>
+          </div>
+        </footer>
+      </div>
+    </div>
+  </div>
+  
+  <!-- modal import rule form -->
+  <div class="modal micromodal-slide" id="modal-import" aria-hidden="true">
+    <div class="modal__overlay" tabindex="-1" data-micromodal-close>
+      <div class="modal__container" role="dialog" aria-modal="true" aria-labelledby="modal-2-title">
+        <header class="modal__header">
+          <h2 class="modal__title" id="modal-2-title">
+            Import rules
+          </h2>
+          <button class="modal__close" aria-label="Close modal" data-micromodal-close></button>
+        </header>
+        <main class="modal__content" id="modal-2-content">
+        	<div class="import-widget">
+            <header><h4 class="standard-font  text-center">Import a XML Blockly rule</h4></header>
+            <div id="file-drop">Drop files here!</div>
+          </div>
+          <div id = "messages"></div>
+        </main>
+        <footer class="modal__footer">
+          <div id="modal-footer-buttons-container">
+            <div id="modal-footer-left-buttons">
+              <button id="button-confirm-import" class="pure-button" data-micromodal-close aria-label="Import this rule">Import rule</button>
             <div class="modal-footer-right-buttons">
               <button class="pure-button" data-micromodal-close aria-label="Close this dialog window">Close</button>
             </div>
@@ -321,13 +340,13 @@
       <div class="modal__container" role="dialog" aria-modal="true" aria-labelledby="modal-3-title">
         <header class="modal__header">
           <h2 class="modal__title" id="modal-event-event-title">
-            Warning
+            Attenzione
           </h2>
           <button class="modal__close" aria-label="Close modal" data-micromodal-close></button>
         </header>
         <main class="modal__content" id="modal-3-content">
-          <p>It is unlikely that two events will occur in the same exact moment.</p>
-          <p>Change one of the trigger type in "Condition".</p>
+          <p>E' molto improbabile che due eventi accadano esattamente nello stesso momento.</p>
+          <p>Dovresti cambiare uno degli eventi in "Condizione".</p>
         </main>
         <footer class="modal__footer">
           <button class="pure-button" data-micromodal-close aria-label="Close this dialog window">Close</button>
@@ -356,6 +375,28 @@
       </div>
     </div>
   </div>
+  
+  <!-- modal warnings -->
+  <div class="modal micromodal-slide" id="modal-warning" aria-hidden="true">
+    <div class="modal__overlay" tabindex="-1" data-micromodal-close>
+      <div class="modal__container" role="dialog" aria-modal="true" aria-labelledby="modal-5-title">
+        <header class="modal__header">
+          <h2 class="modal__title" id="modal-check-title">
+            Warning
+          </h2>
+          <button class="modal__close" aria-label="Close modal" data-micromodal-close></button>
+        </header>
+        <main class="modal__content" id="modal-warning-content">
+          <p>
+          </p>
+        </main>
+        <footer class="modal__footer">
+          <button class="pure-button" data-micromodal-close aria-label="Close this dialog window">Close</button>
+        </footer>
+      </div>
+    </div>
+  </div>
+
 
   </div>
 
@@ -379,36 +420,39 @@
   <script src="node_modules/blockly/blocks/variables.js"></script>
   <script src="node_modules/blockly/blocks/variables_dynamic.js"></script>
   <script src="src/js/staticBlocks.js"></script>
-  <script src="src/js/ML5/p5.min.js"></script>
-  <script src="src/js/ML5/p5.dom.min.js"></script>
-  <script src="src/js/ML5/ml5.min.js" type="text/javascript"></script>
+  <script src="src/js/colour-gradient.js"></script>
   <script type="module" src="src/js/main.js"></script>
   <script src="src/js/dynamicBlocks.js"></script>
   <script type="module">
     import * as Login from './src/js/login.js';
     import {
       saveUserToLocal, checkRuleStructure, checkRuleMeaning,
-      exportSuggestorRule, exportSuggestorDrop,
+      exportSuggestorDrop,
       getWorkspace, exportWorkspace, getRuleSuggestorStatus,
-      changeRecommendationType, clearSuggestionWorkspace, ruleSuggestorManager,
-      getLastBlock, newRule, exportAllRules, eventChange, conditionChange
+      getLastBlock, newRule, exportAllRules, eventChange, conditionChange,
     } from './src/js/main.js';
     import {
       saveRuleInDB, getAllFromDB, getOneFromDB, deleteRule,
       activateRule, deactivateRule, getAllFromDBUser
     } from './src/js/database_functs.js';
-    import { appendRulesList, getFullRule } from './src/js/dom_modifiers.js';
-    import { manageSequentialModal } from './src/js/rs_modalWindows.js';
+    import { appendRulesList, getFullRule, xmlFileToWorkspace } from './src/js/dom_modifiers.js';
     import { changeRecTypeDiv } from './src/js/textarea_manager.js';
     MicroModal.init();
 
     /**
      * Aggiunge un parametro alla funzione assegnata al bottone button-modal-get 
      */
-    function addArgsToFunct() {
+    function buttonGetMyRules() {
       appendRulesList("rule_list");
     }
 
+    /**
+     * Aggiunge un parametro alla funzione assegnata al bottone button-modal-get 
+     */
+    function buttonGetAllRules() {
+      appendRulesList("rule_list", true);
+    }
+    
     /**
      * Controlla che il workspace sia nello stato corretto per il salvataggio
      * prima di mostrare la finestra modale di conferma salvataggio
@@ -423,6 +467,10 @@
       else {
         document.getElementById('textarea-alerts').innerHTML = "";
         document.getElementById('textarea-alerts').innerHTML = "Can't save: " + checkStatus;
+        // If rule is not saved it is a problem: better show also a modal
+        MicroModal.show('modal-warning');
+        document.getElementById('modal-warning-content').innerHTML = "";
+        document.getElementById('modal-warning-content').innerHTML = "Can't save: " + checkStatus;
       }
     }
 
@@ -445,9 +493,6 @@
     //const buttonUsername = document.getElementById("button-username");
     //buttonUsername.addEventListener("click", saveToLocalWrapper, false);
 
-    //const suggestorRule = document.getElementById("suggestor-rule");
-    //suggestorRule.addEventListener("click", exportSuggestorRule, false);
-
     //const suggestorDrop = document.getElementById("suggestor-drop");
     //suggestorDrop.addEventListener("click", exportSuggestorDrop, false);
 
@@ -464,8 +509,14 @@
     buttonConfirmSave.addEventListener("click", saveRuleInDB, false);
 
     const buttonGetAll = document.getElementById("button-modal-get");
-    buttonGetAll.addEventListener("click", addArgsToFunct, false);
+    buttonGetAll.addEventListener("click", buttonGetMyRules, false);
 
+    //const buttonGetAllAllUsers = document.getElementById("button-modal-get-all");
+    //buttonGetAllAllUsers.addEventListener("click", buttonGetAllRules, false);
+    
+    const buttonExportWorkspace = document.getElementById("button-modal-export");
+    buttonExportWorkspace.addEventListener("click", exportWorkspace, false);
+    
     const buttonExportAll = document.getElementById("button-export-all");
     buttonExportAll.addEventListener("click", exportAllRules, false);
 
@@ -489,6 +540,52 @@
 
     const buttonConditionChange = document.getElementById("custom-dialog-condition-change");
     buttonConditionChange.addEventListener("click", conditionChange, false)
+   
+      let file_drop = document.getElementById('file-drop');
+  file_drop.addEventListener(
+    'dragover',
+    function handleDragOver(evt) {
+      evt.stopPropagation()
+      evt.preventDefault()
+      evt.dataTransfer.dropEffect = 'copy'
+    },
+    false
+  )
+  file_drop.addEventListener(
+    'drop',
+    function(evt) {
+      evt.stopPropagation()
+      evt.preventDefault()
+      var files = evt.dataTransfer.files  // FileList object.
+      var file = files[0]                 // File     object.
+       $('#messages').append($('<li>').text("File imported"));
+        if(file){
+          console.log(file);
+          readFile(file);
+        }
+        else {
+          console.log("No file!")
+        }
+    },
+    false
+  )
+
+    function readFile(file){
+    var reader = new FileReader();
+    reader.readAsText(file, "UTF-8");
+    reader.onload = function (evt) {
+      let doc = evt.target.result;
+      if(doc){
+        xmlFileToWorkspace(doc);
+      }
+      else {
+        console.log("error extracting xml from file")
+      }
+    }
+    reader.onerror = function (evt) {
+      console.log("error loading file")
+    }
+}
 
   </script>
 

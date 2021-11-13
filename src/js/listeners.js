@@ -1,19 +1,21 @@
 import {
   getWorkspace, checkInTriggerInfo, getTriggerList, getAllTriggerInWorkspace,
-  getBlockType, setTriggerList, getActionList,
-  setActionList, getRuleBlock, hasTriggerChild, getOperatorWithoutNextConn,
+  getRuleBlock, hasTriggerChild, getOperatorWithoutNextConn,
   checkIfTriggerOperator, getTriggerWithNoNextConnection, checkIfAction,
   getNextViableBlockForAction, hasActionChild, setLastBlock, getLastBlock,
-  exportSuggestorRule, clearSuggestionWorkspace, setRevertPossibility,
+  clearSuggestionWorkspace, setRevertPossibility,
   extractChildRecursive, getRuleBlocksArr, cleanRuleBlocksArr,
-  ruleSuggestorManager, getSuggestionWorkspace, checkInTriggerOperators,
+  getSuggestionWorkspace, checkInTriggerOperators,
   checkInActionOperators, setRuleSequence, getRuleSequence,
-  removeToInputsFromEventTime, setClickedEventConditionBlock, checkEventEvent, returnTriggerType
+  removeToInputsFromEventTime, addToInputsFromEventTime, checkEventEvent, 
+  setClickedEventConditionBlock, returnTriggerType
 } from "./main.js";
 
 import {
   printError, cleanTextAreaAlerts, afterTriggerMessage, afterActionMessage,
-  afterTriggerOpMessage, afterActionOpMessage
+  afterTriggerOpMessage, afterActionOpMessage, afterNotMessage, 
+  showCorrectTextareaOperatorMove, showCorrectTextareaOperatorCreate, 
+  showCorrectTextareaOperatorRemove
 } from "./textarea_manager.js";
 
 import { setActionRevert, removeActionRevert, moveSingleBlockToMain } from "./dom_modifiers.js";
@@ -22,6 +24,10 @@ import { checkConnection } from "./connections_checks.js";
 
 import { modalEventConditionChangeShow } from "./modal_manager.js";
 
+/**
+ * Used to check if the "event-event" condition is verified
+ * @param {*} event 
+ */
 export function addedEventToWorkspace(event){
   "use strict";
   let workspace = getWorkspace();
@@ -43,20 +49,16 @@ export function removedBlockFromWorkspace(event) {
   "use strict";
   let workspace = getWorkspace();
   if (event.type && event.type === 'delete') {
+    showCorrectTextareaOperatorRemove(); //if a block is deleted, restore the default button toolbox behaviour (all buttons deselected)
+    
+    // a che serve la sequenza? se era solo per il RS tantovale eliminare questa roba
     setRuleSequence();
     let sequence = getRuleSequence();
-    if (sequence.elements.length > 0) {
+    if (sequence.elements && sequence.elements.length > 0) {
       let last = sequence.elementsWithId[sequence.elementsWithId.length - 1];
       if (last) {
         let block = workspace.getBlockById(last.id);
         setLastBlock(block);
-        let nextBlock = block.getNextBlock();
-        if (nextBlock === null) {
-          ruleSuggestorManager(block);
-        }
-        else {
-          ruleSuggestorManager(block, true, nextBlock.blockType);
-        }
       }
     }
   }
@@ -88,6 +90,22 @@ export function secondaryWorkspaceLeftClick(event) {
     let block = workspace.blockDB_[event.blockId];
     if (block) {
       moveSingleBlockToMain(block);
+    }
+  }
+}
+
+/**
+ * 
+ * @param {*} event 
+ */
+export function addedNegationToWorkspace(event) {
+  "use strict";
+  let workspace = getWorkspace();
+  if (event.type && event.type === 'create') {
+    let block = workspace.blockDB_[event.blockId];
+    if (block && block.type ==="not_dynamic") {
+        afterNotMessage();
+        //ruleSuggestorManager(block);
     }
   }
 }
@@ -162,26 +180,6 @@ export function addedActionOpToWorkspace(event) {
         afterActionOpMessage();
       }
     }
-  }
-}
-
-/**
- * Listeners for get the blocks into the main "rule" block when ... ? 
- * NON METTERLO IN UN LISTENER MA FALLO SPARARE DOPO AUTOCHECKRULE
- */
-export function ruleBlockChangesListener(event) {
-  "use strict";
-  console.log(event.type);
-  // controllare che la sequenza attuale sia diversa dall'ultima
-  if (event.type === "move") {
-    let ruleBlock = getRuleBlock();
-    cleanRuleBlocksArr();
-    extractChildRecursive(ruleBlock);
-    let ruleBlocksArr = getRuleBlocksArr();
-    console.log(ruleBlocksArr);
-    clearSuggestionWorkspace();
-    //TODO controllare che la sequenza attuale sia corretta e che sia diversa dall'ultima prima di 
-    // fare la raccomandazione
   }
 }
 
@@ -335,33 +333,25 @@ export function triggerTypeListenerParent(event) {
 }
 
 /**
- * Listens for when a "event" block is created, check if parent is a "time" 
- * trigger, if yes removes the "from" inputs
+ * Adds a second "time" field when the "between" operator is selected, removes 
+ * it when another op. is selected.
  * @param {*} event 
  */
-export function eventListenerForTimeTrigger(event) {
+export function betweenListenerForTimeTrigger(event) {
   "use strict";
   let workspace = getWorkspace();
-  if (event.type) {
+  if (event.type && event.type === "change") {
     let block = workspace.blockDB_[event.blockId];
-    //let blockType = getBlockType(block);
-    if (block) {
-      if (block.parentBlock_) {
-        if (block.type === "event") {
-          let isTrigger = checkInTriggerInfo(block.parentBlock_);
-          if (isTrigger) {
-            block.parentBlock_.getField("EVENT_CONDITION").setText("becomes");
-            if (block.parentBlock_.name === "Time") { //TODO: move this in a separate listener
-              let parent = block.getParent();
-              removeToInputsFromEventTime(parent);
-            }
-          }
+    if (block && block.type === "dateTime-localTime") {
+      console.log(block);
+      block.inputList.forEach( (e) => { 
+        if (e.name === "TIME_OPERATOR") {
+            e.fieldRow[0].value_ === "BETWEEN" ?  addToInputsFromEventTime(block) : removeToInputsFromEventTime(block);
         }
-      }
+       });
     }
   }
 }
-
 
 
 /**
@@ -457,64 +447,6 @@ export function ruleTypeListener(event) {
   }
 }
 
-
-/**
- * 
- * @param {*} event 
- */
-export function dateTimeCreationListener(event) {
-  "use strict";
-  let workspace = getWorkspace();
-  let rule_xml = Blockly.Xml.workspaceToDom(workspace, true);
-  let rule_string = JSON.stringify(rule_xml);
-  // voglio che appaia il prompt solo quando è un evento di creazione di singolo
-  // blocco, non quando vengono copiati dal workspace dei suggeriementi
-  if (event.type === "create" && event.ids.length === 1) {
-    let block = workspace.blockDB_[event.blockId];
-    //let blockType = getBlockType(block);
-    if (block) {
-      if (block.type === "dateTime-localTime") {
-        console.log(block);
-        let startInput = block.getInput("START_TIME");
-        let endInput = block.getInput("END_TIME");
-        let mainBlockStartConnection = startInput.connection;
-        let mainBlockEndConnection = endInput.connection;
-        let timeBlock1 = workspace.newBlock('hour_min');
-        let timeBlock2 = workspace.newBlock('hour_min');
-        let subBlock1Connection = timeBlock1.outputConnection;
-        let subBlock2Connection = timeBlock2.outputConnection;
-        //let mainBlockConnection = relatedBlock.getInput(myName).connection;
-        timeBlock1.initSvg();
-        timeBlock1.render();
-        timeBlock2.initSvg();
-        timeBlock2.render();
-        mainBlockStartConnection.connect(subBlock1Connection);
-        mainBlockEndConnection.connect(subBlock2Connection);
-      }
-      else if (block.type === "dateTime-localDate") {
-        console.log(block);
-        let dateBlock = workspace.newBlock('day');
-        dateBlock.initSvg();
-        dateBlock.render();
-        block.getInput("DATE").connection.connect(dateBlock.outputConnection);
-        block.getInput("DATE").connection.disconnect();
-        block.getInput("DATE").connection.connect(dateBlock.outputConnection);
-        /*
-        let dateInput = block.getInput("DATE");
-        let mainBlockDateConnection = dateInput.connection;
-        let dateBlock = workspace.newBlock('day');
-        let dateConnection = dateBlock.outputConnection;
-        //let mainBlockConnection = relatedBlock.getInput(myName).connection;
-        dateBlock.initSvg();
-        dateBlock.render();
-        dateConnection.connect(mainBlockDateConnection);
-        //mainBlockDateConnection.connect(dateConnection);
-        */
-      }
-    }
-  }
-}
-
 /**
  * Listener per aggiornare il numero di blocchi di tipo "action_placeholder", 
  * collegati al numero di rami nel blocco "parallel branches". 
@@ -602,6 +534,7 @@ export function removeUnusedNotBlocks(event) {
       for (let item in db) {
         if (db[item].type === "not_dynamic" && db[item].parentBlock_ === null) {
           db[item].dispose();
+
         }
       }
     }
@@ -618,46 +551,6 @@ export function updateCodeListener(event) {
   let workspace = getWorkspace();
   var code = Blockly.JavaScript.workspaceToCode(workspace);
   //document.getElementById('code_textarea').value =code;
-}
-
-/**
- * Non serve più
- * Listener per catturare quando un blocco "wait after" viene connesso all'
- * uscita nextStatement di un blocco "parallel_dynamic". Chiama il metodo
- * mangageDyamicCheckbox. Da finire se evenutalmente verrà usato.
- * @param {*} event 
- */
-export function waitToParallelListener(event) {
-  "use strict";
-  let workspace = getWorkspace();
-  let movedBlock = workspace.getBlockById(event.blockId);
-  if (movedBlock && movedBlock.type === "after_dynamic") {
-    if (movedBlock.previousConnection && movedBlock.previousConnection.targetConnection && movedBlock.previousConnection.targetConnection.sourceBlock_.type === "parallel_dynamic") {
-      let connectedToId = movedBlock.previousConnection.targetConnection.sourceBlock_.id;
-      let connectedToBlock = workspace.getBlockById(connectedToId);
-      let branches = connectedToBlock.inputList.length - 1;
-      manageDynamicCheckbox(movedBlock, branches);
-    }
-  }
-}
-
-/**
- * Non serve più
- * Metodo per fare si che il numero di checkbox nel blocco "wait after" sia
- * uguale a quello dei parallel branches nel blocco "parallel_dynamic" cui è
- * connesso. Da finire se evenutalmente si vuole usare. 
- * @param {*} block 
- * @param {*} branches_number 
- */
-function manageDynamicCheckbox(block, branches_number) {
-  "use strict";
-  for (let i = 0; i < branches_number; i++) {
-    var checkbox = new Blockly.FieldCheckbox("false");
-    let stdIndex = i + 1;
-    let myName = "branch_" + i;
-    let myLabel = "Branch " + stdIndex + ": ";
-    block.appendDummyInput().appendField(checkbox);
-  }
 }
 
 
@@ -697,6 +590,60 @@ export function eventConditionBlocksLeftClick(event) {
          modalEventConditionChangeShow(block); 
         // Blockly.prompt("Select trigger type: ", event.blockId);
     }
+  }
+}
+
+/**
+ * Listener to catch the creation and the clicks/drag on a blocks, 
+ * to update the bar on the lower part of the screen
+ * @param {*} event 
+ */
+export function toolboxListenerLeftClick(event) {
+  "use strict";
+  if (event.element === "click" || event.type === "move") {
+    let workspace = getWorkspace();
+    let block = workspace.blockDB_[event.blockId];
+    console.log(block.type);
+    if (block) {
+        if(block.type !== "event" && 
+           block.type !== "condition" &&
+           block.type !== "not_dynamic" &&
+           block.type !== "and" &&
+           block.type !== "or"){ // Only rule, trigger and actions are considered 
+          setLastBlock(block);
+        }
+        if(block.type !== "event" &&  // No need to update if is event or condition 
+           block.type !== "condition"){
+          showCorrectTextareaOperatorMove(block);
+          }
+      }
+  }
+}
+
+/**
+ * Listener to catch the creation and the clicks on a block, 
+ * to update the bar on the lower part of the screen
+ * @param {*} event 
+ */
+export function toolboxListenerCreated(event) {
+  "use strict";
+  if (event.type === "create") {
+    let workspace = getWorkspace();
+    let block = workspace.blockDB_[event.blockId];
+    console.log(block.type);
+    if (block) {
+        if(block.type !== "event" && 
+           block.type !== "condition" &&
+           block.type !== "not_dynamic" &&
+           block.type !== "and" &&
+           block.type !== "or"){ //event, conditions and operator are not counted
+          setLastBlock(block);
+        }
+        if(block.type !== "event" &&
+           block.type !== "condition"){
+          showCorrectTextareaOperatorCreate(block);
+        }
+      }
   }
 }
 
@@ -741,26 +688,3 @@ export function blockDisconnectListener(event) {
   }
 }
 
-
-
-/**
- * Listener for the last inserted block in the workspace. 
- * recommandation is fired after rule checker
- */
-export function lastTriggerActionListener(event) {
-  "use strict";
-  if (event.type && event.type === 'create') {
-    let workspace = getWorkspace();
-    let block = workspace.blockDB_[event.blockId];
-    if (block) {
-      let lastBlock = getLastBlock();
-      if (block.isTrigger || block.isTriggerArray || block.isAction) {
-        console.log("BLOCK ISTRIGGER/ACT")
-        if (lastBlock === undefined || lastBlock.id !== block.id) {
-          setLastBlock(block);
-          ruleSuggestorManager(block);
-        }
-      }
-    }
-  }
-}
